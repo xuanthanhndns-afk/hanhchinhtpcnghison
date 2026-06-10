@@ -92,25 +92,25 @@
       "id": "m-2026-06-11-lunch",
       "mealDate": "2026-06-11",
       "shift": "lunch",
-      "dishes": "Com, thit kho, rau xao, canh",
+      "dishes": "Cơm, thịt kho, rau xào, canh",
       "items": [
         {
           "seq": 1,
-          "name": "Com",
+          "name": "Cơm",
           "grams": 250,
           "unitPrice": 20,
           "amount": 5000
         },
         {
           "seq": 2,
-          "name": "Thit kho",
+          "name": "Thịt kho",
           "grams": 100,
           "unitPrice": 120,
           "amount": 12000
         },
         {
           "seq": 3,
-          "name": "Rau xao",
+          "name": "Rau xào",
           "grams": 100,
           "unitPrice": 30,
           "amount": 3000
@@ -134,25 +134,25 @@
       "id": "m-2026-06-11-dinner",
       "mealDate": "2026-06-11",
       "shift": "dinner",
-      "dishes": "Com, ca sot, rau luoc, canh",
+      "dishes": "Cơm, cá sốt, rau luộc, canh",
       "items": [
         {
           "seq": 1,
-          "name": "Com",
+          "name": "Cơm",
           "grams": 250,
           "unitPrice": 20,
           "amount": 5000
         },
         {
           "seq": 2,
-          "name": "Ca sot",
+          "name": "Cá sốt",
           "grams": 120,
           "unitPrice": 100,
           "amount": 12000
         },
         {
           "seq": 3,
-          "name": "Rau luoc",
+          "name": "Rau luộc",
           "grams": 100,
           "unitPrice": 25,
           "amount": 2500

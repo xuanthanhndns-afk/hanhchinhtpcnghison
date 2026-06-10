@@ -13,18 +13,18 @@ const today = new Date().toISOString().slice(0, 10);
 const currentMonth = new Date().toISOString().slice(0, 7);
 
 function money(value) {
-  return Number(value || 0).toLocaleString("vi-VN") + " d";
+  return Number(value || 0).toLocaleString("vi-VN") + " đ";
 }
 
 function shiftLabel(shift) {
-  return shift === "lunch" ? "Trua" : "Toi";
+  return shift === "lunch" ? "Trưa" : "Tối";
 }
 
 function roleLabel(role) {
   return {
     admin: "Admin",
-    kitchen: "Nha bep",
-    worker: "Cong nhan",
+    kitchen: "Nhà bếp",
+    worker: "Công nhân",
   }[role] || role;
 }
 
@@ -35,7 +35,7 @@ async function api(path, options = {}) {
     ...options,
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "Loi he thong");
+  if (!response.ok) throw new Error(data.error || "Lỗi hệ thống");
   return data;
 }
 
@@ -65,20 +65,20 @@ async function init() {
 function renderLogin() {
   app.innerHTML = html`
     <main class="login">
-      <img class="login-logo" src="/logo.jpg" alt="EVNGENCO1 Cong ty Nhiet dien Nghi Son" />
-      <h1>Quan ly com ca</h1>
-      <p class="muted">Cong nhan dang nhap bang so dien thoai. Tai khoan noi bo co the dung ma duoc cap.</p>
+      <img class="login-logo" src="/logo.jpg" alt="EVNGENCO1 Công ty Nhiệt điện Nghi Sơn" />
+      <h1>Hệ thống quản lý cơm ca</h1>
+      <p class="muted">Công nhân đăng nhập bằng số điện thoại. Tài khoản nội bộ có thể dùng mã được cấp.</p>
       <form id="loginForm">
-        <label>So dien thoai / tai khoan
+        <label>Số điện thoại / tài khoản
           <input name="loginId" value="0901000001" autocomplete="username" />
         </label>
-        <label>Mat khau
+        <label>Mật khẩu
           <input name="password" type="password" value="123456" autocomplete="current-password" />
         </label>
-        <button>Dang nhap</button>
+        <button>Đăng nhập</button>
         <div id="loginMessage"></div>
       </form>
-      <p class="muted">Mau: 0901000001 / 0901000002 / 0901000003, mat khau 123456. Quan ly: admin / 123456, Nhabep / 123456.</p>
+      <p class="muted">Tài khoản mẫu: 0901000001 / 0901000002 / 0901000003, mật khẩu 123456. Quản lý: admin / 123456, Nhabep / 123456.</p>
     </main>
   `;
   document.querySelector("#loginForm").addEventListener("submit", async (event) => {
@@ -103,18 +103,18 @@ function renderShell() {
         <div class="brand">
           <img class="brand-logo" src="/logo.jpg" alt="EVNGENCO1" />
           <div>
-            <h1>He thong quan ly com ca</h1>
+            <h1>Hệ thống quản lý cơm ca</h1>
             <p>${state.user.fullName} - ${roleLabel(state.user.role)} - ${state.user.department}</p>
           </div>
         </div>
         <div class="actions">
-          <span class="userline">Gio chot: ${state.settings.cutoffTime}</span>
-          <button class="secondary" id="logoutBtn">Dang xuat</button>
+          <span class="userline">Giờ chốt: ${state.settings.cutoffTime}</span>
+          <button class="secondary" id="logoutBtn">Đăng xuất</button>
         </div>
       </header>
       <main class="main">
-        ${state.user.registrationLockedNow ? `<div class="notice bad-notice">Tai khoan dang bi khoa dang ky: ${state.user.lockReasonNow}</div>` : ""}
-        ${state.user.mustChangePassword ? `<div class="notice">Anh/chi dang dung mat khau mac dinh. Vao tab Ho so de doi mat khau.</div>` : ""}
+        ${state.user.registrationLockedNow ? `<div class="notice bad-notice">Tài khoản đang bị khóa đăng ký: ${state.user.lockReasonNow}</div>` : ""}
+        ${state.user.mustChangePassword ? `<div class="notice">Anh/chị đang dùng mật khẩu mặc định. Vào tab Hồ sơ để đổi mật khẩu.</div>` : ""}
         ${renderTabs()}
         <section id="view"></section>
       </main>
@@ -137,12 +137,12 @@ function renderShell() {
 function renderTabs() {
   const tabs = [];
   if (state.user.role === "admin") tabs.push(["admin", "Admin"]);
-  if (state.user.role === "worker") tabs.push(["worker", "Dang ky cua toi"]);
-  if (["admin", "kitchen"].includes(state.user.role)) tabs.push(["kitchen", "Nha bep"]);
-  if (["admin", "kitchen"].includes(state.user.role)) tabs.push(["daily", "Bao cao ngay"]);
-  if (["admin", "kitchen", "worker"].includes(state.user.role)) tabs.push(["monthly", "Dong tien"]);
-  if (state.user.role === "admin") tabs.push(["reconcile", "Doi soat & Telegram"]);
-  tabs.push(["profile", "Ho so"]);
+  if (state.user.role === "worker") tabs.push(["worker", "Đăng ký của tôi"]);
+  if (["admin", "kitchen"].includes(state.user.role)) tabs.push(["kitchen", "Nhà bếp"]);
+  if (["admin", "kitchen"].includes(state.user.role)) tabs.push(["daily", "Báo cáo ngày"]);
+  if (["admin", "kitchen", "worker"].includes(state.user.role)) tabs.push(["monthly", "Dòng tiền"]);
+  if (state.user.role === "admin") tabs.push(["reconcile", "Đối soát & Telegram"]);
+  tabs.push(["profile", "Hồ sơ"]);
   return `<nav class="tabs">${tabs
     .map(([id, label]) => `<button class="tab ${state.tab === id ? "active" : ""}" data-tab="${id}">${label}</button>`)
     .join("")}</nav>`;
@@ -172,11 +172,11 @@ function menuItemsTotal(items) {
 
 function renderMenuItemsTable(items, compact = false) {
   const rows = items || [];
-  if (!rows.length) return `<p class="muted">Chua co dinh luong mon an.</p>`;
+  if (!rows.length) return `<p class="muted">Chưa có định lượng món ăn.</p>`;
   return html`
     <div class="table-wrap menu-detail">
       <table>
-        <thead><tr><th>STT</th><th>Ten mon</th><th>Dinh luong gam</th><th>Don gia</th><th>Thanh tien</th></tr></thead>
+        <thead><tr><th>STT</th><th>Tên món</th><th>Định lượng (gam)</th><th>Đơn giá</th><th>Thành tiền</th></tr></thead>
         <tbody>
           ${rows
             .map(
@@ -186,14 +186,14 @@ function renderMenuItemsTable(items, compact = false) {
         </tbody>
       </table>
     </div>
-    <p class="${compact ? "muted" : ""}"><strong>Tong gia tien moi suat:</strong> ${money(menuItemsTotal(rows))}</p>
+    <p class="${compact ? "muted" : ""}"><strong>Tổng giá tiền mỗi suất:</strong> ${money(menuItemsTotal(rows))}</p>
   `;
 }
 
 function defaultMenuRows() {
   return [
-    { seq: 1, name: "Com", grams: 250, unitPrice: 20 },
-    { seq: 2, name: "Mon man", grams: 100, unitPrice: 120 },
+    { seq: 1, name: "Cơm", grams: 250, unitPrice: 20 },
+    { seq: 2, name: "Món mặn", grams: 100, unitPrice: 120 },
     { seq: 3, name: "Rau", grams: 100, unitPrice: 30 },
     { seq: 4, name: "Canh", grams: 150, unitPrice: 10 },
   ];
@@ -205,11 +205,11 @@ function addMenuInputRow(item = {}) {
   const tr = document.createElement("tr");
   tr.innerHTML = html`
     <td><input class="menu-seq" type="number" value="${seq}" min="1" /></td>
-    <td><input class="menu-name" value="${item.name || ""}" placeholder="Ten mon" /></td>
+    <td><input class="menu-name" value="${item.name || ""}" placeholder="Tên món" /></td>
     <td><input class="menu-grams" type="number" value="${item.grams || 0}" min="0" /></td>
     <td><input class="menu-unit-price" type="number" value="${item.unitPrice || 0}" min="0" /></td>
     <td><input class="menu-amount" type="number" value="${menuItemAmount(item)}" min="0" readonly /></td>
-    <td><button type="button" class="danger menu-remove">Xoa</button></td>
+    <td><button type="button" class="danger menu-remove">Xóa</button></td>
   `;
   tbody.appendChild(tr);
   tr.querySelectorAll("input").forEach((input) => input.addEventListener("input", updateMenuInputTotals));
@@ -283,13 +283,13 @@ function orderFor(date, shift, employeeCode = state.user.employeeCode) {
 }
 
 function statusBadge(order) {
-  if (!order) return `<span class="status">Chua dang ky</span>`;
+  if (!order) return `<span class="status">Chưa đăng ký</span>`;
   const labels = {
-    registered: "Da dang ky",
-    locked: "Da chot",
-    added_after_cutoff: "Bep bo sung",
-    cancelled_before_cutoff: "Da huy truoc 08h",
-    cancelled_by_admin: "Huy dac biet",
+    registered: "Đã đăng ký",
+    locked: "Đã chốt",
+    added_after_cutoff: "Bếp bổ sung",
+    cancelled_before_cutoff: "Đã hủy trước 08h",
+    cancelled_by_admin: "Hủy đặc biệt",
   };
   const cls = ["registered", "locked", "added_after_cutoff"].includes(order.status) ? "ok" : "bad";
   return `<span class="status ${cls}">${labels[order.status] || order.status}</span>`;
@@ -301,33 +301,33 @@ function renderAdmin() {
   view.innerHTML = html`
     <div class="grid">
       <section class="panel span-6">
-        <h2>Nhap danh sach cong nhan tu Excel</h2>
-        <p class="muted">Trong Excel, chon Save As CSV. Dong dau tien nen co cot: phone, employeeCode, fullName, department.</p>
+        <h2>Nhập danh sách công nhân từ Excel</h2>
+        <p class="muted">Trong Excel, chọn Save As CSV. Dòng đầu tiên nên có các cột: phone, employeeCode, fullName, department.</p>
         <textarea id="workerCsv">phone,employeeCode,fullName,department
 0901000004,CN004,Pham Van D,Van hanh</textarea>
         <div class="actions">
-          <button id="importWorkersBtn">Nhap danh sach</button>
+          <button id="importWorkersBtn">Nhập danh sách</button>
         </div>
         <div id="adminImportMessage"></div>
       </section>
       <section class="panel span-6">
-        <h2>Thong tin he thong</h2>
-        <p><strong>Tong cong nhan:</strong> ${workers.length}</p>
-        <p><strong>Tai khoan quan ly:</strong> admin, Nhabep</p>
-        <p class="muted">Admin co the xem toan bo tai khoan, xoa cong nhan va quan ly dong tien trong tab Dong tien.</p>
+        <h2>Thông tin hệ thống</h2>
+        <p><strong>Tổng công nhân:</strong> ${workers.length}</p>
+        <p><strong>Tài khoản quản lý:</strong> admin, Nhabep</p>
+        <p class="muted">Admin có thể xem toàn bộ tài khoản, xóa công nhân và quản lý dòng tiền trong tab Dòng tiền.</p>
       </section>
       <section class="panel span-12">
-        <h2>Danh sach tai khoan cong nhan</h2>
+        <h2>Danh sách tài khoản công nhân</h2>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Ma NV</th><th>So dien thoai</th><th>Ho ten</th><th>Bo phan</th><th>Telegram</th><th>Trang thai</th><th>Khoa dang ky</th><th></th></tr></thead>
+            <thead><tr><th>Mã NV</th><th>Số điện thoại</th><th>Họ tên</th><th>Bộ phận</th><th>Telegram</th><th>Trạng thái</th><th>Khóa đăng ký</th><th></th></tr></thead>
             <tbody>
               ${workers
                 .map(
                   (u) => `<tr>
                     <td>${u.employeeCode}</td><td>${u.phone || ""}</td><td>${u.fullName}</td><td>${u.department}</td><td>${u.telegramChatId || ""}</td>
-                    <td>${u.status}</td><td>${u.registrationLocked ? "Dang khoa" : "Mo"}</td>
-                    <td><button class="danger" data-delete-worker="${u.employeeCode}">Xoa</button></td>
+                    <td>${u.status}</td><td>${u.registrationLocked ? "Đang khóa" : "Mở"}</td>
+                    <td><button class="danger" data-delete-worker="${u.employeeCode}">Xóa</button></td>
                   </tr>`
                 )
                 .join("")}
@@ -352,14 +352,14 @@ async function importWorkers() {
     });
     await loadBootstrap();
     renderAdmin();
-    setMessage("#adminImportMessage", `Da nhap: them ${data.created}, cap nhat ${data.updated}.`, "success");
+    setMessage("#adminImportMessage", `Đã nhập: thêm ${data.created}, cập nhật ${data.updated}.`, "success");
   } catch (err) {
     setMessage("#adminImportMessage", err.message, "error");
   }
 }
 
 async function deleteWorker(employeeCode) {
-  if (!confirm(`Xoa cong nhan ${employeeCode}?`)) return;
+  if (!confirm(`Xóa công nhân ${employeeCode}?`)) return;
   try {
     await api("/api/admin/delete-worker", {
       method: "POST",
@@ -378,12 +378,12 @@ async function renderWorker() {
   view.innerHTML = html`
     <div class="grid">
       <section class="panel span-12">
-        <h2>Dang ky com</h2>
+        <h2>Đăng ký cơm</h2>
         <div class="row">
           <label>Ngay an
             <input id="workerDate" type="date" value="${today}" />
           </label>
-          <button id="reloadWorker" class="secondary">Xem ngay</button>
+          <button id="reloadWorker" class="secondary">Xem ngày</button>
         </div>
         <div id="workerMeals"></div>
       </section>
@@ -399,7 +399,7 @@ function renderWorkerMeals() {
   const container = document.querySelector("#workerMeals");
   const disabled = state.user.registrationLockedNow ? "disabled" : "";
   container.innerHTML = html`
-    ${state.user.registrationLockedNow ? `<div class="notice bad-notice">Khong the dang ky com cho den khi thanh toan thanh cong.</div>` : ""}
+    ${state.user.registrationLockedNow ? `<div class="notice bad-notice">Không thể đăng ký cơm cho đến khi thanh toán thành công.</div>` : ""}
     <div class="grid">
       ${["lunch", "dinner"].map((shift) => renderMealCard(date, shift, disabled)).join("")}
     </div>
@@ -419,12 +419,12 @@ function renderMealCard(date, shift, disabled) {
   return html`
     <article class="panel span-6">
       <h3>Ca ${shiftLabel(shift)}</h3>
-      ${menu ? renderMenuItemsTable(menu.items || [], true) : "<p>Nha bep chua nhap thuc don.</p>"}
-      <p class="muted">Don gia suat an: ${money(menu ? menu.price : state.settings.defaultMealPrice)}</p>
+      ${menu ? renderMenuItemsTable(menu.items || [], true) : "<p>Nhà bếp chưa nhập thực đơn.</p>"}
+      <p class="muted">Đơn giá suất ăn: ${money(menu ? menu.price : state.settings.defaultMealPrice)}</p>
       <p>${statusBadge(order)}</p>
       <div class="actions">
-        <button ${disabled} data-register data-date="${date}" data-shift="${shift}">Dang ky</button>
-        <button class="danger" data-cancel data-date="${date}" data-shift="${shift}">Huy</button>
+        <button ${disabled} data-register data-date="${date}" data-shift="${shift}">Đăng ký</button>
+        <button class="danger" data-cancel data-date="${date}" data-shift="${shift}">Hủy</button>
       </div>
     </article>
   `;
@@ -465,40 +465,40 @@ function renderKitchen() {
   view.innerHTML = html`
     <div class="grid">
       <section class="panel span-6">
-        <h2>Nhap dinh luong mon an</h2>
+        <h2>Nhập định lượng món ăn</h2>
         <form id="menuForm" class="form-grid">
-          <label>Ngay an <input name="mealDate" type="date" value="${today}" /></label>
-          <label>Ca an
+          <label>Ngày ăn <input name="mealDate" type="date" value="${today}" /></label>
+          <label>Ca ăn
             <select name="shift">
-              <option value="lunch">Trua</option>
-              <option value="dinner">Toi</option>
+              <option value="lunch">Trưa</option>
+              <option value="dinner">Tối</option>
             </select>
           </label>
           <div>
-            <label>Danh sach mon an theo dinh luong</label>
+            <label>Danh sách món ăn theo định lượng</label>
             <div class="table-wrap input-table">
               <table>
-                <thead><tr><th>STT</th><th>Ten mon</th><th>Dinh luong gam</th><th>Don gia/gam</th><th>Thanh tien</th><th></th></tr></thead>
+                <thead><tr><th>STT</th><th>Tên món</th><th>Định lượng (gam)</th><th>Đơn giá/gam</th><th>Thành tiền</th><th></th></tr></thead>
                 <tbody id="menuItemsBody"></tbody>
               </table>
             </div>
             <div class="row menu-total-row">
-              <button type="button" class="secondary" id="addMenuRowBtn">Them mon</button>
-              <strong>Tong gia tien moi suat: <span id="menuItemsTotal">0 d</span></strong>
+              <button type="button" class="secondary" id="addMenuRowBtn">Thêm món</button>
+              <strong>Tổng giá tiền mỗi suất: <span id="menuItemsTotal">0 đ</span></strong>
             </div>
           </div>
-          <label>Dinh muc du kien <input name="plannedQty" type="number" value="300" /></label>
-          <label>Don gia suat an tu dong <input id="menuPrice" name="price" type="number" value="${state.settings.defaultMealPrice}" readonly /></label>
-          <label>Ghi chu <input name="note" /></label>
-          <button>Luu dinh luong bua an</button>
+          <label>Định mức dự kiến <input name="plannedQty" type="number" value="300" /></label>
+          <label>Đơn giá suất ăn tự động <input id="menuPrice" name="price" type="number" value="${state.settings.defaultMealPrice}" readonly /></label>
+          <label>Ghi chú <input name="note" /></label>
+          <button>Lưu định lượng bữa ăn</button>
           <div id="menuMessage"></div>
         </form>
       </section>
       <section class="panel span-6">
-        <h2>Bo sung suat sau 08h</h2>
+        <h2>Bổ sung suất sau 08h</h2>
         <form id="addOrderForm" class="form-grid">
-          <label>Ngay an <input name="mealDate" type="date" value="${today}" /></label>
-          <label>Ma nhan vien
+          <label>Ngày ăn <input name="mealDate" type="date" value="${today}" /></label>
+          <label>Mã nhân viên
             <select name="employeeCode">
               ${state.users
                 .filter((u) => u.role === "worker")
@@ -506,14 +506,14 @@ function renderKitchen() {
                 .join("")}
             </select>
           </label>
-          <label>Ca an
+          <label>Ca ăn
             <select name="shift">
-              <option value="lunch">Trua</option>
-              <option value="dinner">Toi</option>
+              <option value="lunch">Trưa</option>
+              <option value="dinner">Tối</option>
             </select>
           </label>
-          <label>Ghi chu <input name="note" placeholder="Dang ky truc tiep voi bep" /></label>
-          <button>Bo sung suat</button>
+          <label>Ghi chú <input name="note" placeholder="Đăng ký trực tiếp với bếp" /></label>
+          <button>Bổ sung suất</button>
           <div id="kitchenMessage"></div>
         </form>
       </section>
@@ -531,7 +531,7 @@ function renderKitchen() {
       body.price = menuItemsTotal(body.items);
       await api("/api/menus", { method: "POST", body: JSON.stringify(body) });
       await loadBootstrap();
-      setMessage("#menuMessage", "Da luu thuc don.", "success");
+      setMessage("#menuMessage", "Đã lưu thực đơn.", "success");
     } catch (err) {
       setMessage("#menuMessage", err.message, "error");
     }
@@ -541,7 +541,7 @@ function renderKitchen() {
     const body = Object.fromEntries(new FormData(event.currentTarget));
     try {
       await api("/api/orders/register", { method: "POST", body: JSON.stringify(body) });
-      setMessage("#kitchenMessage", "Da bo sung suat.", "success");
+      setMessage("#kitchenMessage", "Đã bổ sung suất.", "success");
     } catch (err) {
       setMessage("#kitchenMessage", err.message, "error");
     }
@@ -552,10 +552,10 @@ function renderDaily() {
   const view = document.querySelector("#view");
   view.innerHTML = html`
     <section class="panel">
-      <h2>Bao cao so suat theo ngay</h2>
+      <h2>Báo cáo số suất theo ngày</h2>
       <div class="row">
-        <label>Ngay an <input id="dailyDate" type="date" value="${today}" /></label>
-        <button id="loadDaily">Xem bao cao</button>
+        <label>Ngày ăn <input id="dailyDate" type="date" value="${today}" /></label>
+        <button id="loadDaily">Xem báo cáo</button>
       </div>
       <div id="dailyContent"></div>
     </section>
@@ -571,14 +571,14 @@ async function loadDailyReport() {
     <div class="summary">
       ${data.summary
         .map(
-          (s) => `<div class="metric"><span>${s.shiftLabel}</span><strong>${s.totalQty}</strong><small>Dinh muc ${s.plannedQty}, bo sung ${s.addedAfterCutoffQty}, gia tri thuc don ${money(s.totalMenuValue)}</small></div>`
+          (s) => `<div class="metric"><span>${s.shiftLabel}</span><strong>${s.totalQty}</strong><small>Định mức ${s.plannedQty}, bổ sung ${s.addedAfterCutoffQty}, giá trị thực đơn ${money(s.totalMenuValue)}</small></div>`
         )
         .join("")}
     </div>
-    <h3>Dinh luong thuc don</h3>
+    <h3>Định lượng thực đơn</h3>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Ca</th><th>STT</th><th>Ten mon</th><th>Dinh luong gam</th><th>Don gia</th><th>Thanh tien</th></tr></thead>
+        <thead><tr><th>Ca</th><th>STT</th><th>Tên món</th><th>Định lượng (gam)</th><th>Đơn giá</th><th>Thành tiền</th></tr></thead>
         <tbody>
           ${data.summary
             .flatMap((s) => (s.menuItems || []).map((item) => ({ shiftLabel: s.shiftLabel, ...item })))
@@ -587,10 +587,10 @@ async function loadDailyReport() {
         </tbody>
       </table>
     </div>
-    <h3>Danh sach chi tiet</h3>
+    <h3>Danh sách chi tiết</h3>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Ma NV</th><th>Ho ten</th><th>Bo phan</th><th>Ca</th><th>Gia</th><th>Trang thai</th><th>Nguon</th></tr></thead>
+        <thead><tr><th>Mã NV</th><th>Họ tên</th><th>Bộ phận</th><th>Ca</th><th>Giá</th><th>Trạng thái</th><th>Nguồn</th></tr></thead>
         <tbody>
           ${data.orders
             .map(
@@ -607,10 +607,10 @@ function renderMonthly() {
   const view = document.querySelector("#view");
   view.innerHTML = html`
     <section class="panel">
-      <h2>Cong no tien com thang</h2>
+      <h2>Công nợ tiền cơm tháng</h2>
       <div class="row">
-        <label>Thang <input id="monthInput" type="month" value="${currentMonth}" /></label>
-        <button id="loadMonthly">Xem cong no</button>
+        <label>Tháng <input id="monthInput" type="month" value="${currentMonth}" /></label>
+        <button id="loadMonthly">Xem công nợ</button>
       </div>
       <div id="monthlyContent"></div>
     </section>
@@ -626,7 +626,7 @@ async function loadMonthlyReport() {
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>Ma NV</th><th>So dien thoai</th><th>Ho ten</th><th>Bo phan</th><th>Trua</th><th>Toi</th><th>Tong tien</th><th>Noi dung CK</th><th>QR</th><th>Trang thai</th><th></th></tr>
+          <tr><th>Mã NV</th><th>Số điện thoại</th><th>Họ tên</th><th>Bộ phận</th><th>Trưa</th><th>Tối</th><th>Tổng tiền</th><th>Nội dung CK</th><th>QR</th><th>Trạng thái</th><th></th></tr>
         </thead>
         <tbody>
           ${data.debts
@@ -635,8 +635,8 @@ async function loadMonthlyReport() {
               return `<tr>
                 <td>${d.employeeCode}</td><td>${user.phone || state.user.phone || ""}</td><td>${d.fullName}</td><td>${d.department}</td><td>${d.lunchQty}</td><td>${d.dinnerQty}</td><td>${money(d.totalAmount)}</td>
                 <td>${d.paymentCode}</td><td><img class="qr" src="${d.qrUrl}" alt="QR ${d.employeeCode}" /></td>
-                <td><span class="status ${d.status === "paid" ? "ok" : "warn"}">${d.status === "paid" ? "Da thanh toan" : "Chua thanh toan"}</span></td>
-                <td>${state.user.role === "admin" ? `<button data-paid="${d.employeeCode}" data-month="${data.month}">Da thu</button>` : ""}</td>
+                <td><span class="status ${d.status === "paid" ? "ok" : "warn"}">${d.status === "paid" ? "Đã thanh toán" : "Chưa thanh toán"}</span></td>
+                <td>${state.user.role === "admin" ? `<button data-paid="${d.employeeCode}" data-month="${data.month}">Đã thu</button>` : ""}</td>
               </tr>`;
             })
             .join("")}
@@ -661,29 +661,29 @@ function renderReconcile() {
   view.innerHTML = html`
     <div class="grid">
       <section class="panel span-6">
-        <h2>Doi soat sao ke CSV</h2>
+        <h2>Đối soát sao kê CSV</h2>
         <div class="form-grid">
-          <label>Thang <input id="reconcileMonth" type="month" value="${currentMonth}" /></label>
-          <label>Noi dung CSV
+          <label>Tháng <input id="reconcileMonth" type="month" value="${currentMonth}" /></label>
+          <label>Nội dung CSV
             <textarea id="csvInput">date,amount,description
 2026-07-01,625000,0901000001 COM T06-2026</textarea>
           </label>
-          <button id="reconcileBtn">Doi soat</button>
+          <button id="reconcileBtn">Đối soát</button>
         </div>
         <div id="reconcileResult"></div>
       </section>
       <section class="panel span-6">
-        <h2>Nhac Telegram va khoa qua han</h2>
-        <p class="muted">Sau ${state.settings.paymentGraceDays || 5} ngay cua thang ke tiep, neu chua thanh toan thi he thong nhac va khoa quyen dang ky cua cong nhan.</p>
+        <h2>Nhắc Telegram và khóa quá hạn</h2>
+        <p class="muted">Sau ${state.settings.paymentGraceDays || 5} ngày của tháng kế tiếp, nếu chưa thanh toán thì hệ thống nhắc và khóa quyền đăng ký của công nhân.</p>
         <div class="form-grid">
-          <label>Thang <input id="telegramMonth" type="month" value="${currentMonth}" /></label>
-          <button id="telegramBtn">Gui nhac / khoa neu qua han</button>
+          <label>Tháng <input id="telegramMonth" type="month" value="${currentMonth}" /></label>
+          <button id="telegramBtn">Gửi nhắc / khóa nếu quá hạn</button>
         </div>
         <div id="telegramResult"></div>
       </section>
       <section class="panel span-12">
-        <h2>Danh sach dang bi khoa</h2>
-        <button id="loadLocked" class="secondary">Tai danh sach</button>
+        <h2>Danh sách đang bị khóa</h2>
+        <button id="loadLocked" class="secondary">Tải danh sách</button>
         <div id="lockedContent"></div>
       </section>
     </div>
@@ -703,7 +703,7 @@ async function reconcileCsv() {
         csv: document.querySelector("#csvInput").value,
       }),
     });
-    document.querySelector("#reconcileResult").innerHTML = `<p class="success">Khop ${data.matched.length} giao dich, chua khop ${data.unmatched.length} giao dich.</p>`;
+    document.querySelector("#reconcileResult").innerHTML = `<p class="success">Khớp ${data.matched.length} giao dịch, chưa khớp ${data.unmatched.length} giao dịch.</p>`;
     await loadBootstrap();
     loadLockedUsers();
   } catch (err) {
@@ -717,7 +717,7 @@ async function sendTelegramReminders() {
       method: "POST",
       body: JSON.stringify({ month: document.querySelector("#telegramMonth").value }),
     });
-    document.querySelector("#telegramResult").innerHTML = `<p class="success">Da xu ly ${data.results.length} tin nhan/nhac no.</p>`;
+    document.querySelector("#telegramResult").innerHTML = `<p class="success">Đã xử lý ${data.results.length} tin nhắn/nhắc nợ.</p>`;
     await loadBootstrap();
     loadLockedUsers();
   } catch (err) {
@@ -733,7 +733,7 @@ async function loadLockedUsers() {
     target.innerHTML = html`
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Ma NV</th><th>So dien thoai</th><th>Ho ten</th><th>Bo phan</th><th>Ly do</th></tr></thead>
+          <thead><tr><th>Mã NV</th><th>Số điện thoại</th><th>Họ tên</th><th>Bộ phận</th><th>Lý do</th></tr></thead>
           <tbody>
             ${data.rows
               .map((r) => `<tr><td>${r.user.employeeCode}</td><td>${r.user.phone || ""}</td><td>${r.user.fullName}</td><td>${r.user.department}</td><td>${r.lock.reason}</td></tr>`)
@@ -752,27 +752,27 @@ function renderProfile() {
   view.innerHTML = html`
     <div class="grid">
       <section class="panel span-6">
-        <h2>Thong tin tai khoan</h2>
-        <p><strong>Ho ten:</strong> ${state.user.fullName}</p>
-        <p><strong>Ma NV:</strong> ${state.user.employeeCode}</p>
-        <p><strong>So dien thoai dang nhap:</strong> ${state.user.phone || ""}</p>
-        <p><strong>Telegram Chat ID:</strong> ${state.user.telegramChatId || "Chua lien ket"}</p>
-        <p class="muted">Telegram Bot khong gui truc tiep theo so dien thoai neu nguoi dung chua lien ket bot. Anh/chị can lay Telegram Chat ID va luu vao day.</p>
+        <h2>Thông tin tài khoản</h2>
+        <p><strong>Họ tên:</strong> ${state.user.fullName}</p>
+        <p><strong>Mã NV:</strong> ${state.user.employeeCode}</p>
+        <p><strong>Số điện thoại đăng nhập:</strong> ${state.user.phone || ""}</p>
+        <p><strong>Telegram Chat ID:</strong> ${state.user.telegramChatId || "Chưa liên kết"}</p>
+        <p class="muted">Telegram Bot không gửi trực tiếp theo số điện thoại nếu người dùng chưa liên kết bot. Anh/chị cần lấy Telegram Chat ID và lưu vào đây.</p>
       </section>
       <section class="panel span-6">
-        <h2>Doi mat khau</h2>
+        <h2>Đổi mật khẩu</h2>
         <form id="passwordForm" class="form-grid">
-          <label>Mat khau hien tai <input name="currentPassword" type="password" /></label>
-          <label>Mat khau moi <input name="newPassword" type="password" /></label>
-          <button>Doi mat khau</button>
+          <label>Mật khẩu hiện tại <input name="currentPassword" type="password" /></label>
+          <label>Mật khẩu mới <input name="newPassword" type="password" /></label>
+          <button>Đổi mật khẩu</button>
           <div id="passwordMessage"></div>
         </form>
       </section>
       <section class="panel span-6">
-        <h2>Lien ket Telegram</h2>
+        <h2>Liên kết Telegram</h2>
         <form id="telegramProfileForm" class="form-grid">
           <label>Telegram Chat ID <input name="telegramChatId" value="${state.user.telegramChatId || ""}" /></label>
-          <button>Luu Telegram</button>
+          <button>Lưu Telegram</button>
           <div id="profileTelegramMessage"></div>
         </form>
       </section>
@@ -786,7 +786,7 @@ function renderProfile() {
         body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget))),
       });
       await loadBootstrap();
-      setMessage("#passwordMessage", "Da doi mat khau.", "success");
+      setMessage("#passwordMessage", "Đã đổi mật khẩu.", "success");
       renderShell();
     } catch (err) {
       setMessage("#passwordMessage", err.message, "error");
@@ -800,7 +800,7 @@ function renderProfile() {
         body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget))),
       });
       await loadBootstrap();
-      setMessage("#profileTelegramMessage", "Da luu Telegram Chat ID.", "success");
+      setMessage("#profileTelegramMessage", "Đã lưu Telegram Chat ID.", "success");
     } catch (err) {
       setMessage("#profileTelegramMessage", err.message, "error");
     }
@@ -808,5 +808,5 @@ function renderProfile() {
 }
 
 init().catch((err) => {
-  app.innerHTML = `<main class="login"><h1>Loi</h1><p class="error">${err.message}</p></main>`;
+  app.innerHTML = `<main class="login"><h1>Lỗi</h1><p class="error">${err.message}</p></main>`;
 });
