@@ -2,7 +2,12 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const XLSX = require("xlsx");
+let XLSX = null;
+try {
+  XLSX = require("xlsx");
+} catch {
+  XLSX = null;
+}
 
 const PORT = Number(process.env.PORT || 3000);
 const DATA_FILE = path.join(__dirname, "data", "db.json");
@@ -271,6 +276,9 @@ function parseCsv(raw) {
 }
 
 function parseXlsxBase64(fileBase64) {
+  if (!XLSX) {
+    throw new Error("Chua cai thu vien doc Excel. Vui long chay npm install hoac doi Render deploy xong.");
+  }
   const buffer = Buffer.from(String(fileBase64 || ""), "base64");
   if (!buffer.length) return [];
   const workbook = XLSX.read(buffer, { type: "buffer", cellDates: false, raw: false });
@@ -285,7 +293,7 @@ function normalizeHeader(value) {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
+    .replace(/[\u0111\u0110]/g, "d")
     .replace(/[^a-z0-9]/g, "");
 }
 
@@ -423,7 +431,7 @@ async function api(req, res) {
       for (const row of rows) {
         const phone = pick(row, ["phone", "sodienthoai", "so dien thoai", "số điện thoại", "dien thoai", "sdt"]);
         const employeeCode = pick(row, ["employeeCode", "manv", "ma nv", "ma nhan vien"]) || phone;
-        const fullName = pick(row, ["fullName", "hoten", "ho ten", "họ tên", "họ và tên", "ten"]);
+        const fullName = pick(row, ["fullName", "hoten", "ho ten", "hovaten", "ho va ten", "họ tên", "họ và tên", "ten"]);
         if (!phone || !fullName) continue;
         let worker = db.users.find((u) => u.role === "worker" && (u.phone === phone || u.employeeCode === employeeCode));
         if (!worker) {
@@ -450,6 +458,9 @@ async function api(req, res) {
           department: pick(row, ["department", "bophan", "bo phan", "bộ phận", "phong ban"]) || worker.department || "",
         });
       }
+      if (!created && !updated) {
+        return json(res, 400, { error: "Khong nhap duoc dong nao. Vui long kiem tra file co dung cot: So thu tu, Ho va ten, Bo phan, So dien thoai." });
+      }
       audit(db, user, "IMPORT_WORKERS", { created, updated });
       writeDb(db);
       return json(res, 200, { created, updated });
@@ -465,6 +476,21 @@ async function api(req, res) {
       if (!worker) return json(res, 404, { error: "Khong tim thay cong nhan" });
       db.users = db.users.filter((u) => u.id !== worker.id);
       audit(db, user, "DELETE_WORKER", { employeeCode });
+      writeDb(db);
+      return json(res, 200, { ok: true });
+    }
+
+    if (route === "POST /api/admin/reset-worker-password") {
+      const user = requireRole(req, res, ["admin"]);
+      if (!user) return;
+      const body = await readBody(req);
+      const db = readDb();
+      const employeeCode = String(body.employeeCode || "");
+      const worker = db.users.find((u) => u.employeeCode === employeeCode && u.role === "worker");
+      if (!worker) return json(res, 404, { error: "Khong tim thay thanh vien" });
+      worker.password = "123456";
+      worker.mustChangePassword = true;
+      audit(db, user, "RESET_WORKER_PASSWORD", { employeeCode });
       writeDb(db);
       return json(res, 200, { ok: true });
     }

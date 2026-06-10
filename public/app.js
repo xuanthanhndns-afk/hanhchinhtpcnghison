@@ -103,6 +103,7 @@ function renderLogin() {
         <button>Đăng nhập</button>
         <div id="loginMessage"></div>
       </form>
+      <p class="muted login-help">Quên mật khẩu? Vui lòng liên hệ Admin để đặt lại mật khẩu mặc định 123456.</p>
       <p class="muted copyright">Copyright @EVNGENCO1TPCNGHISON</p>
     </main>
   `;
@@ -392,13 +393,14 @@ function renderAdmin() {
         <h2>Danh sách tài khoản thành viên</h2>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>STT</th><th>Họ và tên</th><th>Bộ phận</th><th>Số điện thoại</th><th>Telegram</th><th>Trạng thái</th><th>Khóa đăng ký</th><th></th></tr></thead>
+            <thead><tr><th>STT</th><th>Họ và tên</th><th>Bộ phận</th><th>Số điện thoại</th><th>Telegram</th><th>Trạng thái</th><th>Khóa đăng ký</th><th>Mật khẩu</th><th></th></tr></thead>
             <tbody>
               ${workers
                 .map(
                   (u, index) => `<tr>
                     <td>${index + 1}</td><td>${u.fullName}</td><td>${u.department}</td><td>${u.phone || ""}</td><td>${u.telegramChatId || ""}</td>
                     <td>${u.status}</td><td>${u.registrationLocked ? "Đang khóa" : "Mở"}</td>
+                    <td><button class="secondary" data-reset-worker="${u.employeeCode}">Đặt lại</button></td>
                     <td><button class="danger" data-delete-worker="${u.employeeCode}">Xóa</button></td>
                   </tr>`
                 )
@@ -450,6 +452,9 @@ function renderAdmin() {
     document.querySelectorAll("[data-delete-worker]").forEach((btn) => {
       btn.addEventListener("click", () => deleteWorker(btn.dataset.deleteWorker));
     });
+    document.querySelectorAll("[data-reset-worker]").forEach((btn) => {
+      btn.addEventListener("click", () => resetWorkerPassword(btn.dataset.resetWorker));
+    });
   } else {
     document.querySelector("#chefForm").addEventListener("submit", saveChef);
     document.querySelectorAll("[data-delete-chef]").forEach((btn) => {
@@ -484,6 +489,21 @@ async function deleteWorker(employeeCode) {
     });
     await loadBootstrap();
     renderAdmin();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function resetWorkerPassword(employeeCode) {
+  if (!confirm(`Đặt lại mật khẩu thành viên ${employeeCode} về 123456?`)) return;
+  try {
+    await api("/api/admin/reset-worker-password", {
+      method: "POST",
+      body: JSON.stringify({ employeeCode }),
+    });
+    await loadBootstrap();
+    renderAdmin();
+    alert("Đã đặt lại mật khẩu về 123456. Thành viên sẽ phải đổi mật khẩu khi đăng nhập lại.");
   } catch (err) {
     alert(err.message);
   }

@@ -37,6 +37,7 @@ Mo trinh duyet: `http://localhost:3000`
 
 - Admin nhap danh sach cong nhan tu file Excel luu dang CSV, xem/xoa tai khoan cong nhan, quan ly dong tien tung account.
 - Admin quan ly danh sach dau bep gom ho ten va so dien thoai.
+- Admin co the dat lai mat khau thanh vien ve `123456`; thanh vien bat buoc doi mat khau khi dang nhap lai.
 - Nha bep nhap/sua dinh luong tung mon an theo bua bang cac o co san: so thu tu, ten mon, dinh luong gam, don gia/gam. He thong tu tinh thanh tien tung mon va tong gia tien moi suat.
 - Khi nhap dinh luong suat an, co the chon mot hoac nhieu dau bep thuc hien bua an.
 - Cong nhan dang ky/huy truoc 08h ngay an.
@@ -89,6 +90,10 @@ So thu tu,Ho va ten,Bo phan,So dien thoai
 1,Nguyen Van A,May 1,0901000001
 2,Tran Thi B,May 2,0901000002
 ```
+
+## Luu y luu tru du lieu khi dua len Render
+
+Ban hien tai luu du lieu vao file `data/db.json`. Neu chay tren Render ma khong gan persistent disk hoac database rieng, du lieu nhap moi co the mat khi service redeploy/restart. Giai doan sau nen chuyen sang PostgreSQL hoac gan persistent disk de luu du lieu ben vung.
 
 ## Mau CSV sao ke
 
