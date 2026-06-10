@@ -176,6 +176,12 @@ label {
   gap: 14px;
 }
 
+.copyright {
+  margin-top: 18px;
+  text-align: center;
+  font-size: 13px;
+}
+
 .tabs {
   display: flex;
   gap: 8px;

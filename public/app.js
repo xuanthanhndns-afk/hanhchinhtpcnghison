@@ -67,7 +67,7 @@ function renderLogin() {
     <main class="login">
       <img class="login-logo" src="/logo.jpg" alt="EVNGENCO1 Công ty Nhiệt điện Nghi Sơn" />
       <h1>Hệ thống quản lý cơm ca</h1>
-      <p class="muted">Công nhân đăng nhập bằng số điện thoại. Tài khoản nội bộ có thể dùng mã được cấp.</p>
+      <p class="muted">Bạn là thành viên của gia đình TPCNGHISON hãy đăng nhập bằng số điện thoại đã đăng ký để sử dụng hệ thống.</p>
       <form id="loginForm">
         <label>Số điện thoại / tài khoản
           <input name="loginId" value="0901000001" autocomplete="username" />
@@ -78,7 +78,7 @@ function renderLogin() {
         <button>Đăng nhập</button>
         <div id="loginMessage"></div>
       </form>
-      <p class="muted">Tài khoản mẫu: 0901000001 / 0901000002 / 0901000003, mật khẩu 123456. Quản lý: admin / 123456, Nhabep / 123456.</p>
+      <p class="muted copyright">Copyright @EVNGENCO1TPCNGHISON</p>
     </main>
   `;
   document.querySelector("#loginForm").addEventListener("submit", async (event) => {
