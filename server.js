@@ -268,10 +268,21 @@ function parseCsv(raw) {
   });
 }
 
+function normalizeHeader(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/[^a-z0-9]/g, "");
+}
+
 function pick(row, names) {
   const entries = Object.entries(row);
+  const normalizedNames = new Set(names.map(normalizeHeader));
   for (const name of names) {
-    const found = entries.find(([k]) => k.trim().toLowerCase() === name.toLowerCase());
+    const found = entries.find(([k]) => normalizeHeader(k) === normalizeHeader(name) || normalizedNames.has(normalizeHeader(k)));
     if (found) return String(found[1] || "").trim();
   }
   return "";
@@ -391,9 +402,10 @@ async function api(req, res) {
       let created = 0;
       let updated = 0;
       for (const row of rows) {
-        const phone = pick(row, ["phone", "sodienthoai", "so dien thoai", "dien thoai", "sdt"]);
+        const phone = pick(row, ["phone", "sodienthoai", "so dien thoai", "số điện thoại", "dien thoai", "sdt"]);
         const employeeCode = pick(row, ["employeeCode", "manv", "ma nv", "ma nhan vien"]) || phone;
-        const fullName = pick(row, ["fullName", "hoten", "ho ten", "ten"]);
+        const fullName = pick(row, ["fullName", "hoten", "ho ten", "họ tên", "ten"]);
+        const birthYear = pick(row, ["birthYear", "namsinh", "nam sinh", "năm sinh"]);
         if (!phone || !fullName) continue;
         let worker = db.users.find((u) => u.role === "worker" && (u.phone === phone || u.employeeCode === employeeCode));
         if (!worker) {
@@ -417,7 +429,8 @@ async function api(req, res) {
           employeeCode,
           phone,
           fullName,
-          department: pick(row, ["department", "bophan", "bo phan", "phong ban"]) || worker.department || "",
+          birthYear: birthYear || worker.birthYear || "",
+          department: pick(row, ["department", "bophan", "bo phan", "bộ phận", "phong ban"]) || worker.department || "",
         });
       }
       audit(db, user, "IMPORT_WORKERS", { created, updated });

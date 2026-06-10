@@ -29,6 +29,13 @@ function roleLabel(role) {
   }[role] || role;
 }
 
+function userDisplayLine(user) {
+  if (user.role !== "worker") {
+    return `${user.fullName} - ${roleLabel(user.role)} - ${user.department || ""}`;
+  }
+  return `Họ và tên: ${user.fullName} | Số điện thoại: ${user.phone || ""} | Bộ phận công tác: ${user.department || ""}`;
+}
+
 async function api(path, options = {}) {
   const response = await fetch(path, {
     credentials: "same-origin",
@@ -68,7 +75,7 @@ function renderLogin() {
     <main class="login">
       <img class="login-logo" src="/logo.jpg" alt="EVNGENCO1 Công ty Nhiệt điện Nghi Sơn" />
       <h1>Hệ thống quản lý cơm ca</h1>
-      <p class="muted">Bạn là thành viên của gia đình TPCNGHISON hãy đăng nhập bằng số điện thoại đã đăng ký để sử dụng hệ thống.</p>
+      <p class="muted login-intro">Bạn là thành viên của gia đình EVNGENCO1TPCNGHISON hãy đăng nhập bằng số điện thoại đã đăng ký để sử dụng hệ thống.</p>
       <form id="loginForm">
         <label>Số điện thoại / tài khoản
           <input name="loginId" value="0901000001" autocomplete="username" />
@@ -105,7 +112,7 @@ function renderShell() {
           <img class="brand-logo" src="/logo.jpg" alt="EVNGENCO1" />
           <div>
             <h1>Hệ thống quản lý cơm ca</h1>
-            <p>${state.user.fullName} - ${roleLabel(state.user.role)} - ${state.user.department}</p>
+            <p>${userDisplayLine(state.user)}</p>
           </div>
         </div>
         <div class="actions">
@@ -307,9 +314,9 @@ function renderAdmin() {
     <div class="grid">
       <section class="panel span-6">
         <h2>Nhập danh sách công nhân từ Excel</h2>
-        <p class="muted">Trong Excel, chọn Save As CSV. Dòng đầu tiên nên có các cột: phone, employeeCode, fullName, department.</p>
-        <textarea id="workerCsv">phone,employeeCode,fullName,department
-0901000004,CN004,Pham Van D,Van hanh</textarea>
+        <p class="muted">Trong Excel, dùng file mẫu có các cột: Họ tên, Năm sinh, Số điện thoại, Bộ phận. Khi nhập vào hệ thống, chọn Save As CSV rồi dán nội dung vào ô dưới đây.</p>
+        <textarea id="workerCsv">Họ tên,Năm sinh,Số điện thoại,Bộ phận
+Phạm Văn D,1991,0901000004,Vận hành</textarea>
         <div class="actions">
           <button id="importWorkersBtn">Nhập danh sách</button>
         </div>
@@ -325,12 +332,12 @@ function renderAdmin() {
         <h2>Danh sách tài khoản công nhân</h2>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Mã NV</th><th>Số điện thoại</th><th>Họ tên</th><th>Bộ phận</th><th>Telegram</th><th>Trạng thái</th><th>Khóa đăng ký</th><th></th></tr></thead>
+            <thead><tr><th>Mã NV</th><th>Số điện thoại</th><th>Họ tên</th><th>Năm sinh</th><th>Bộ phận</th><th>Telegram</th><th>Trạng thái</th><th>Khóa đăng ký</th><th></th></tr></thead>
             <tbody>
               ${workers
                 .map(
                   (u) => `<tr>
-                    <td>${u.employeeCode}</td><td>${u.phone || ""}</td><td>${u.fullName}</td><td>${u.department}</td><td>${u.telegramChatId || ""}</td>
+                    <td>${u.employeeCode}</td><td>${u.phone || ""}</td><td>${u.fullName}</td><td>${u.birthYear || ""}</td><td>${u.department}</td><td>${u.telegramChatId || ""}</td>
                     <td>${u.status}</td><td>${u.registrationLocked ? "Đang khóa" : "Mở"}</td>
                     <td><button class="danger" data-delete-worker="${u.employeeCode}">Xóa</button></td>
                   </tr>`
@@ -788,6 +795,8 @@ function renderProfile(forcePasswordChange = false) {
         <h2>Thông tin tài khoản</h2>
         <p><strong>Họ tên:</strong> ${state.user.fullName}</p>
         <p><strong>Mã NV:</strong> ${state.user.employeeCode}</p>
+        <p><strong>Năm sinh:</strong> ${state.user.birthYear || ""}</p>
+        <p><strong>Bộ phận công tác:</strong> ${state.user.department || ""}</p>
         <p><strong>Số điện thoại đăng nhập:</strong> ${state.user.phone || ""}</p>
         <p><strong>Telegram Chat ID:</strong> ${state.user.telegramChatId || "Chưa liên kết"}</p>
         <p class="muted">Telegram Bot không gửi trực tiếp theo số điện thoại nếu người dùng chưa liên kết bot. Anh/chị cần lấy Telegram Chat ID và lưu vào đây.</p>

@@ -161,6 +161,7 @@ label {
 .login h1 {
   margin: 0 0 8px;
   font-size: 24px;
+  text-align: center;
 }
 
 .login-logo {
@@ -168,6 +169,11 @@ label {
   width: min(100%, 360px);
   height: auto;
   margin: 0 auto 18px;
+}
+
+.login-intro {
+  text-align: center;
+  line-height: 1.45;
 }
 
 .login form,

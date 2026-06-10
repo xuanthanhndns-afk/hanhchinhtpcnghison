@@ -75,12 +75,17 @@ Trong danh sach user, moi cong nhan can co `telegramChatId`.
 
 ## Mau file Excel/CSV nhap cong nhan
 
-Trong Excel, tao cac cot sau roi Save As CSV:
+Co file mau trong thu muc `templates`:
+
+- `templates/Mau_nhap_danh_sach_cong_nhan.xlsx`
+- `templates/Mau_nhap_danh_sach_cong_nhan.csv`
+
+Trong Excel, tao cac cot sau roi Save As CSV. He thong se tu dung so dien thoai lam tai khoan dang nhap va mat khau mac dinh la `123456`:
 
 ```csv
-phone,employeeCode,fullName,department
-0901000001,CN001,Nguyen Van A,May 1
-0901000002,CN002,Tran Thi B,May 2
+Ho ten,Nam sinh,So dien thoai,Bo phan
+Nguyen Van A,1990,0901000001,May 1
+Tran Thi B,1992,0901000002,May 2
 ```
 
 ## Mau CSV sao ke
