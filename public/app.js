@@ -30,6 +30,9 @@ function roleLabel(role) {
 }
 
 function userDisplayLine(user) {
+  if (user.role === "admin") {
+    return "Admin";
+  }
   if (user.role !== "worker") {
     return `${user.fullName} - ${roleLabel(user.role)} - ${user.department || ""}`;
   }
