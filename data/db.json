@@ -1,0 +1,131 @@
+{
+  "settings": {
+    "cutoffTime": "08:00",
+    "defaultMealPrice": 25000,
+    "payment": {
+      "bankBin": "970436",
+      "accountNo": "0123456789",
+      "accountName": "CONG TY ABC",
+      "template": "compact2"
+    }
+  },
+  "users": [
+    {
+      "id": "u-admin",
+      "employeeCode": "admin",
+      "password": "123456",
+      "fullName": "Quan tri he thong",
+      "department": "Admin",
+      "role": "admin",
+      "status": "active",
+      "telegramChatId": ""
+    },
+    {
+      "id": "u-kitchen",
+      "employeeCode": "kitchen",
+      "password": "123456",
+      "fullName": "Nha bep",
+      "department": "Bep an",
+      "role": "kitchen",
+      "status": "active",
+      "telegramChatId": ""
+    },
+    {
+      "id": "u-accountant",
+      "employeeCode": "accountant",
+      "password": "123456",
+      "fullName": "Ke toan",
+      "department": "Ke toan",
+      "role": "accountant",
+      "status": "active",
+      "telegramChatId": ""
+    },
+    {
+      "id": "u-cn001",
+      "employeeCode": "CN001",
+      "password": "123456",
+      "fullName": "Nguyen Van A",
+      "department": "May 1",
+      "role": "worker",
+      "status": "active",
+      "telegramChatId": ""
+    },
+    {
+      "id": "u-cn002",
+      "employeeCode": "CN002",
+      "password": "123456",
+      "fullName": "Tran Thi B",
+      "department": "May 2",
+      "role": "worker",
+      "status": "active",
+      "telegramChatId": ""
+    },
+    {
+      "id": "u-cn003",
+      "employeeCode": "CN003",
+      "password": "123456",
+      "fullName": "Le Van C",
+      "department": "Co dien",
+      "role": "worker",
+      "status": "active",
+      "telegramChatId": ""
+    }
+  ],
+  "menus": [
+    {
+      "id": "m-2026-06-11-lunch",
+      "mealDate": "2026-06-11",
+      "shift": "lunch",
+      "dishes": "Com, thit kho, rau xao, canh",
+      "plannedQty": 500,
+      "price": 25000,
+      "note": "",
+      "updatedBy": "kitchen",
+      "updatedAt": "2026-06-10T11:00:00.000Z"
+    },
+    {
+      "id": "m-2026-06-11-dinner",
+      "mealDate": "2026-06-11",
+      "shift": "dinner",
+      "dishes": "Com, ca sot, rau luoc, canh",
+      "plannedQty": 300,
+      "price": 25000,
+      "note": "",
+      "updatedBy": "kitchen",
+      "updatedAt": "2026-06-10T11:00:00.000Z"
+    }
+  ],
+  "orders": [
+    {
+      "id": "fabbb11c-2035-47bb-8c8b-ff86bebe2134",
+      "employeeCode": "CN001",
+      "fullName": "Nguyen Van A",
+      "department": "May 1",
+      "mealDate": "2026-06-11",
+      "shift": "lunch",
+      "price": 25000,
+      "status": "registered",
+      "source": "self_before_cutoff",
+      "createdAt": "2026-06-10T03:28:37.035Z",
+      "cancelledAt": "",
+      "operatedBy": "CN001",
+      "note": ""
+    }
+  ],
+  "payments": [],
+  "bankStatements": [],
+  "auditLogs": [
+    {
+      "id": "e5da524e-8927-4f47-bea6-ef3e6b0c90d5",
+      "at": "2026-06-10T03:28:37.035Z",
+      "actor": "CN001",
+      "action": "REGISTER_ORDER",
+      "detail": {
+        "employeeCode": "CN001",
+        "mealDate": "2026-06-11",
+        "shift": "lunch",
+        "status": "registered"
+      }
+    }
+  ]
+}

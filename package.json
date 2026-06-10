@@ -1,0 +1,12 @@
+{
+  "name": "meal-shift-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Web app quan ly dang ky com ca cong nhan",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
