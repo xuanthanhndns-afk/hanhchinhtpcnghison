@@ -7,6 +7,7 @@ const state = {
   menus: [],
   orders: [],
   tab: "worker",
+  kitchenTab: "menu",
 };
 
 const today = new Date().toISOString().slice(0, 10);
@@ -467,17 +468,26 @@ async function cancelOrder(date, shift, employeeCode = "") {
 function renderKitchen() {
   const view = document.querySelector("#view");
   view.innerHTML = html`
+    <div class="subtabs">
+      <button class="tab ${state.kitchenTab === "menu" ? "active" : ""}" data-kitchen-tab="menu">Nhập định lượng suất ăn</button>
+      <button class="tab ${state.kitchenTab === "extra" ? "active" : ""}" data-kitchen-tab="extra">Bổ sung suất ăn</button>
+    </div>
     <div class="grid">
-      <section class="panel span-6">
-        <h2>Nhập định lượng món ăn</h2>
+      ${
+        state.kitchenTab === "menu"
+          ? html`
+      <section class="panel span-12">
+        <h2>Nhập định lượng suất ăn</h2>
         <form id="menuForm" class="form-grid">
-          <label>Ngày ăn <input name="mealDate" type="date" value="${today}" /></label>
-          <label>Ca ăn
-            <select name="shift">
-              <option value="lunch">Trưa</option>
-              <option value="dinner">Tối</option>
-            </select>
-          </label>
+          <div class="form-grid two-cols">
+            <label>Ngày ăn <input name="mealDate" type="date" value="${today}" /></label>
+            <label>Ca ăn
+              <select name="shift">
+                <option value="lunch">Trưa</option>
+                <option value="dinner">Tối</option>
+              </select>
+            </label>
+          </div>
           <div>
             <label>Danh sách món ăn theo định lượng</label>
             <div class="table-wrap input-table">
@@ -491,65 +501,84 @@ function renderKitchen() {
               <strong>Tổng giá tiền mỗi suất: <span id="menuItemsTotal">0 đ</span></strong>
             </div>
           </div>
-          <label>Định mức dự kiến <input name="plannedQty" type="number" value="300" /></label>
-          <label>Đơn giá suất ăn tự động <input id="menuPrice" name="price" type="number" value="${state.settings.defaultMealPrice}" readonly /></label>
-          <label>Ghi chú <input name="note" /></label>
+          <div class="form-grid three-cols">
+            <label>Định mức dự kiến <input name="plannedQty" type="number" value="300" /></label>
+            <label>Đơn giá suất ăn tự động <input id="menuPrice" name="price" type="number" value="${state.settings.defaultMealPrice}" readonly /></label>
+            <label>Ghi chú <input name="note" /></label>
+          </div>
           <button>Lưu định lượng bữa ăn</button>
           <div id="menuMessage"></div>
         </form>
       </section>
-      <section class="panel span-6">
-        <h2>Bổ sung suất sau 08h</h2>
+          `
+          : html`
+      <section class="panel span-12">
+        <h2>Bổ sung suất ăn sau 08h</h2>
         <form id="addOrderForm" class="form-grid">
-          <label>Ngày ăn <input name="mealDate" type="date" value="${today}" /></label>
-          <label>Mã nhân viên
-            <select name="employeeCode">
-              ${state.users
-                .filter((u) => u.role === "worker")
-                .map((u) => `<option value="${u.employeeCode}">${u.employeeCode} - ${u.phone || ""} - ${u.fullName}</option>`)
-                .join("")}
-            </select>
-          </label>
-          <label>Ca ăn
-            <select name="shift">
-              <option value="lunch">Trưa</option>
-              <option value="dinner">Tối</option>
-            </select>
-          </label>
-          <label>Ghi chú <input name="note" placeholder="Đăng ký trực tiếp với bếp" /></label>
+          <div class="form-grid two-cols">
+            <label>Ngày ăn <input name="mealDate" type="date" value="${today}" /></label>
+            <label>Mã nhân viên
+              <select name="employeeCode">
+                ${state.users
+                  .filter((u) => u.role === "worker")
+                  .map((u) => `<option value="${u.employeeCode}">${u.employeeCode} - ${u.phone || ""} - ${u.fullName}</option>`)
+                  .join("")}
+              </select>
+            </label>
+          </div>
+          <div class="form-grid two-cols">
+            <label>Ca ăn
+              <select name="shift">
+                <option value="lunch">Trưa</option>
+                <option value="dinner">Tối</option>
+              </select>
+            </label>
+            <label>Ghi chú <input name="note" placeholder="Đăng ký trực tiếp với bếp" /></label>
+          </div>
           <button>Bổ sung suất</button>
           <div id="kitchenMessage"></div>
         </form>
       </section>
+          `
+      }
     </div>
   `;
-  populateMenuInputRows();
-  document.querySelector("#menuForm [name='mealDate']").addEventListener("change", populateMenuInputRows);
-  document.querySelector("#menuForm [name='shift']").addEventListener("change", populateMenuInputRows);
-  document.querySelector("#addMenuRowBtn").addEventListener("click", () => addMenuInputRow());
-  document.querySelector("#menuForm").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    try {
+  document.querySelectorAll("[data-kitchen-tab]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.kitchenTab = btn.dataset.kitchenTab;
+      renderKitchen();
+    });
+  });
+  if (state.kitchenTab === "menu") {
+    populateMenuInputRows();
+    document.querySelector("#menuForm [name='mealDate']").addEventListener("change", populateMenuInputRows);
+    document.querySelector("#menuForm [name='shift']").addEventListener("change", populateMenuInputRows);
+    document.querySelector("#addMenuRowBtn").addEventListener("click", () => addMenuInputRow());
+    document.querySelector("#menuForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      try {
+        const body = Object.fromEntries(new FormData(event.currentTarget));
+        body.items = collectMenuInputRows();
+        body.price = menuItemsTotal(body.items);
+        await api("/api/menus", { method: "POST", body: JSON.stringify(body) });
+        await loadBootstrap();
+        setMessage("#menuMessage", "Đã lưu thực đơn.", "success");
+      } catch (err) {
+        setMessage("#menuMessage", err.message, "error");
+      }
+    });
+  } else {
+    document.querySelector("#addOrderForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
       const body = Object.fromEntries(new FormData(event.currentTarget));
-      body.items = collectMenuInputRows();
-      body.price = menuItemsTotal(body.items);
-      await api("/api/menus", { method: "POST", body: JSON.stringify(body) });
-      await loadBootstrap();
-      setMessage("#menuMessage", "Đã lưu thực đơn.", "success");
-    } catch (err) {
-      setMessage("#menuMessage", err.message, "error");
-    }
-  });
-  document.querySelector("#addOrderForm").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const body = Object.fromEntries(new FormData(event.currentTarget));
-    try {
-      await api("/api/orders/register", { method: "POST", body: JSON.stringify(body) });
-      setMessage("#kitchenMessage", "Đã bổ sung suất.", "success");
-    } catch (err) {
-      setMessage("#kitchenMessage", err.message, "error");
-    }
-  });
+      try {
+        await api("/api/orders/register", { method: "POST", body: JSON.stringify(body) });
+        setMessage("#kitchenMessage", "Đã bổ sung suất.", "success");
+      } catch (err) {
+        setMessage("#kitchenMessage", err.message, "error");
+      }
+    });
+  }
 }
 
 function renderDaily() {
