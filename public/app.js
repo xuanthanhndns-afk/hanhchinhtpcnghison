@@ -162,6 +162,117 @@ function menuFor(date, shift) {
   return state.menus.find((m) => m.mealDate === date && m.shift === shift);
 }
 
+function menuItemAmount(item) {
+  return Number(item.amount || 0) || Number(item.grams || 0) * Number(item.unitPrice || 0);
+}
+
+function menuItemsTotal(items) {
+  return (items || []).reduce((sum, item) => sum + menuItemAmount(item), 0);
+}
+
+function renderMenuItemsTable(items, compact = false) {
+  const rows = items || [];
+  if (!rows.length) return `<p class="muted">Chua co dinh luong mon an.</p>`;
+  return html`
+    <div class="table-wrap menu-detail">
+      <table>
+        <thead><tr><th>STT</th><th>Ten mon</th><th>Dinh luong gam</th><th>Don gia</th><th>Thanh tien</th></tr></thead>
+        <tbody>
+          ${rows
+            .map(
+              (item) => `<tr><td>${item.seq}</td><td>${item.name}</td><td>${item.grams}</td><td>${money(item.unitPrice)}</td><td>${money(menuItemAmount(item))}</td></tr>`
+            )
+            .join("")}
+        </tbody>
+      </table>
+    </div>
+    <p class="${compact ? "muted" : ""}"><strong>Tong gia tien moi suat:</strong> ${money(menuItemsTotal(rows))}</p>
+  `;
+}
+
+function defaultMenuRows() {
+  return [
+    { seq: 1, name: "Com", grams: 250, unitPrice: 20 },
+    { seq: 2, name: "Mon man", grams: 100, unitPrice: 120 },
+    { seq: 3, name: "Rau", grams: 100, unitPrice: 30 },
+    { seq: 4, name: "Canh", grams: 150, unitPrice: 10 },
+  ];
+}
+
+function addMenuInputRow(item = {}) {
+  const tbody = document.querySelector("#menuItemsBody");
+  const seq = item.seq || tbody.children.length + 1;
+  const tr = document.createElement("tr");
+  tr.innerHTML = html`
+    <td><input class="menu-seq" type="number" value="${seq}" min="1" /></td>
+    <td><input class="menu-name" value="${item.name || ""}" placeholder="Ten mon" /></td>
+    <td><input class="menu-grams" type="number" value="${item.grams || 0}" min="0" /></td>
+    <td><input class="menu-unit-price" type="number" value="${item.unitPrice || 0}" min="0" /></td>
+    <td><input class="menu-amount" type="number" value="${menuItemAmount(item)}" min="0" readonly /></td>
+    <td><button type="button" class="danger menu-remove">Xoa</button></td>
+  `;
+  tbody.appendChild(tr);
+  tr.querySelectorAll("input").forEach((input) => input.addEventListener("input", updateMenuInputTotals));
+  tr.querySelector(".menu-remove").addEventListener("click", () => {
+    tr.remove();
+    renumberMenuRows();
+    updateMenuInputTotals();
+  });
+  updateMenuInputTotals();
+}
+
+function renumberMenuRows() {
+  document.querySelectorAll("#menuItemsBody tr").forEach((tr, index) => {
+    tr.querySelector(".menu-seq").value = index + 1;
+  });
+}
+
+function collectMenuInputRows() {
+  return [...document.querySelectorAll("#menuItemsBody tr")]
+    .map((tr) => {
+      const grams = Number(tr.querySelector(".menu-grams").value || 0);
+      const unitPrice = Number(tr.querySelector(".menu-unit-price").value || 0);
+      const amount = grams * unitPrice;
+      return {
+        seq: Number(tr.querySelector(".menu-seq").value || 0),
+        name: tr.querySelector(".menu-name").value.trim(),
+        grams,
+        unitPrice,
+        amount,
+      };
+    })
+    .filter((item) => item.name);
+}
+
+function updateMenuInputTotals() {
+  const rows = collectMenuInputRows();
+  document.querySelectorAll("#menuItemsBody tr").forEach((tr) => {
+    const grams = Number(tr.querySelector(".menu-grams").value || 0);
+    const unitPrice = Number(tr.querySelector(".menu-unit-price").value || 0);
+    tr.querySelector(".menu-amount").value = grams * unitPrice;
+  });
+  const total = menuItemsTotal(rows);
+  const totalEl = document.querySelector("#menuItemsTotal");
+  const priceInput = document.querySelector("#menuPrice");
+  if (totalEl) totalEl.textContent = money(total);
+  if (priceInput) priceInput.value = total;
+}
+
+function populateMenuInputRows() {
+  const form = document.querySelector("#menuForm");
+  if (!form) return;
+  const mealDate = form.elements.mealDate.value;
+  const shift = form.elements.shift.value;
+  const existing = menuFor(mealDate, shift);
+  const tbody = document.querySelector("#menuItemsBody");
+  tbody.innerHTML = "";
+  const rows = existing && existing.items && existing.items.length ? existing.items : defaultMenuRows();
+  rows.forEach((row) => addMenuInputRow(row));
+  form.elements.plannedQty.value = existing ? existing.plannedQty || 0 : 300;
+  form.elements.note.value = existing ? existing.note || "" : "";
+  updateMenuInputTotals();
+}
+
 async function loadOrders(date = "") {
   const data = await api(`/api/orders${date ? `?mealDate=${encodeURIComponent(date)}` : ""}`);
   state.orders = data.orders;
@@ -308,8 +419,8 @@ function renderMealCard(date, shift, disabled) {
   return html`
     <article class="panel span-6">
       <h3>Ca ${shiftLabel(shift)}</h3>
-      <p>${menu ? menu.dishes : "Nha bep chua nhap thuc don."}</p>
-      <p class="muted">Don gia: ${money(menu ? menu.price : state.settings.defaultMealPrice)}</p>
+      ${menu ? renderMenuItemsTable(menu.items || [], true) : "<p>Nha bep chua nhap thuc don.</p>"}
+      <p class="muted">Don gia suat an: ${money(menu ? menu.price : state.settings.defaultMealPrice)}</p>
       <p>${statusBadge(order)}</p>
       <div class="actions">
         <button ${disabled} data-register data-date="${date}" data-shift="${shift}">Dang ky</button>
@@ -363,14 +474,21 @@ function renderKitchen() {
               <option value="dinner">Toi</option>
             </select>
           </label>
-          <label>Danh sach mon an
-            <textarea name="itemsText" placeholder="Moi dong: STT, Ten mon, Dinh luong gam, Don gia/gam, Thanh tien
-1, Com, 250, 20, 5000
-2, Thit kho, 100, 120, 12000
-3, Rau xao, 100, 30, 3000"></textarea>
-          </label>
+          <div>
+            <label>Danh sach mon an theo dinh luong</label>
+            <div class="table-wrap input-table">
+              <table>
+                <thead><tr><th>STT</th><th>Ten mon</th><th>Dinh luong gam</th><th>Don gia/gam</th><th>Thanh tien</th><th></th></tr></thead>
+                <tbody id="menuItemsBody"></tbody>
+              </table>
+            </div>
+            <div class="row menu-total-row">
+              <button type="button" class="secondary" id="addMenuRowBtn">Them mon</button>
+              <strong>Tong gia tien moi suat: <span id="menuItemsTotal">0 d</span></strong>
+            </div>
+          </div>
           <label>Dinh muc du kien <input name="plannedQty" type="number" value="300" /></label>
-          <label>Don gia suat an thu cua cong nhan <input name="price" type="number" value="${state.settings.defaultMealPrice}" /></label>
+          <label>Don gia suat an tu dong <input id="menuPrice" name="price" type="number" value="${state.settings.defaultMealPrice}" readonly /></label>
           <label>Ghi chu <input name="note" /></label>
           <button>Luu dinh luong bua an</button>
           <div id="menuMessage"></div>
@@ -401,10 +519,17 @@ function renderKitchen() {
       </section>
     </div>
   `;
+  populateMenuInputRows();
+  document.querySelector("#menuForm [name='mealDate']").addEventListener("change", populateMenuInputRows);
+  document.querySelector("#menuForm [name='shift']").addEventListener("change", populateMenuInputRows);
+  document.querySelector("#addMenuRowBtn").addEventListener("click", () => addMenuInputRow());
   document.querySelector("#menuForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     try {
-      await api("/api/menus", { method: "POST", body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget))) });
+      const body = Object.fromEntries(new FormData(event.currentTarget));
+      body.items = collectMenuInputRows();
+      body.price = menuItemsTotal(body.items);
+      await api("/api/menus", { method: "POST", body: JSON.stringify(body) });
       await loadBootstrap();
       setMessage("#menuMessage", "Da luu thuc don.", "success");
     } catch (err) {

@@ -258,6 +258,24 @@ label {
   border-radius: 8px;
 }
 
+.input-table input {
+  min-width: 86px;
+  padding: 7px 8px;
+}
+
+.input-table .menu-name {
+  min-width: 160px;
+}
+
+.menu-detail table {
+  min-width: 560px;
+}
+
+.menu-total-row {
+  justify-content: space-between;
+  margin-top: 10px;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

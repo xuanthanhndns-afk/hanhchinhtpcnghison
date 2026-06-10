@@ -475,8 +475,9 @@ async function api(req, res) {
       const db = readDb();
       const shift = normalizeShift(body.shift);
       const mealDate = String(body.mealDate || "").slice(0, 10);
-      const price = Number(body.price || db.settings.defaultMealPrice);
       const items = Array.isArray(body.items) ? body.items : parseMenuItems(body.itemsText || body.dishes);
+      const totalMenuValue = menuTotal(items);
+      const price = totalMenuValue || Number(body.price || db.settings.defaultMealPrice);
       let menu = getMenu(db, mealDate, shift);
       if (!menu) {
         menu = { id: crypto.randomUUID(), mealDate, shift };
@@ -485,7 +486,7 @@ async function api(req, res) {
       Object.assign(menu, {
         dishes: items.map((item) => item.name).join(", "),
         items,
-        totalMenuValue: menuTotal(items),
+        totalMenuValue,
         plannedQty: Number(body.plannedQty || 0),
         price,
         note: String(body.note || ""),
