@@ -224,6 +224,10 @@ label {
   padding: 16px;
 }
 
+.hidden-panel {
+  display: none;
+}
+
 .panel h2 {
   margin: 0 0 12px;
   font-size: 18px;
@@ -258,13 +262,49 @@ label {
   border-radius: 8px;
 }
 
+.input-table {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.input-table table {
+  min-width: 980px;
+  table-layout: fixed;
+}
+
+.input-table th:nth-child(1),
+.input-table td:nth-child(1) {
+  width: 88px;
+}
+
+.input-table th:nth-child(2),
+.input-table td:nth-child(2) {
+  width: 280px;
+}
+
+.input-table th:nth-child(3),
+.input-table td:nth-child(3),
+.input-table th:nth-child(4),
+.input-table td:nth-child(4),
+.input-table th:nth-child(5),
+.input-table td:nth-child(5) {
+  width: 170px;
+}
+
+.input-table th:nth-child(6),
+.input-table td:nth-child(6) {
+  width: 100px;
+}
+
 .input-table input {
-  min-width: 86px;
+  min-width: 0;
+  width: 100%;
   padding: 7px 8px;
 }
 
 .input-table .menu-name {
-  min-width: 160px;
+  min-width: 0;
 }
 
 .menu-detail table {
@@ -272,8 +312,14 @@ label {
 }
 
 .menu-total-row {
-  justify-content: space-between;
+  justify-content: flex-start;
   margin-top: 10px;
+  gap: 18px;
+}
+
+.menu-total-row strong {
+  min-width: 260px;
+  padding: 9px 0;
 }
 
 table {

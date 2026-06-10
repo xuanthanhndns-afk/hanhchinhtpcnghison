@@ -114,7 +114,7 @@ function renderShell() {
       </header>
       <main class="main">
         ${state.user.registrationLockedNow ? `<div class="notice bad-notice">Tài khoản đang bị khóa đăng ký: ${state.user.lockReasonNow}</div>` : ""}
-        ${state.user.mustChangePassword ? `<div class="notice">Anh/chị đang dùng mật khẩu mặc định. Vào tab Hồ sơ để đổi mật khẩu.</div>` : ""}
+        ${state.user.mustChangePassword && state.user.role === "worker" ? `<div class="notice bad-notice">Anh/chị phải đổi mật khẩu mặc định trước khi sử dụng hệ thống.</div>` : ""}
         ${renderTabs()}
         <section id="view"></section>
       </main>
@@ -136,6 +136,9 @@ function renderShell() {
 
 function renderTabs() {
   const tabs = [];
+  if (state.user.mustChangePassword && state.user.role === "worker") {
+    return `<nav class="tabs"><button class="tab active" data-tab="profile">Đổi mật khẩu</button></nav>`;
+  }
   if (state.user.role === "admin") tabs.push(["admin", "Admin"]);
   if (state.user.role === "worker") tabs.push(["worker", "Đăng ký của tôi"]);
   if (["admin", "kitchen"].includes(state.user.role)) tabs.push(["kitchen", "Nhà bếp"]);
@@ -149,6 +152,7 @@ function renderTabs() {
 }
 
 function renderView() {
+  if (state.user.mustChangePassword && state.user.role === "worker") return renderProfile(true);
   if (state.tab === "admin") return renderAdmin();
   if (state.tab === "worker") return renderWorker();
   if (state.tab === "kitchen") return renderKitchen();
@@ -747,7 +751,7 @@ async function loadLockedUsers() {
   }
 }
 
-function renderProfile() {
+function renderProfile(forcePasswordChange = false) {
   const view = document.querySelector("#view");
   view.innerHTML = html`
     <div class="grid">
@@ -760,7 +764,8 @@ function renderProfile() {
         <p class="muted">Telegram Bot không gửi trực tiếp theo số điện thoại nếu người dùng chưa liên kết bot. Anh/chị cần lấy Telegram Chat ID và lưu vào đây.</p>
       </section>
       <section class="panel span-6">
-        <h2>Đổi mật khẩu</h2>
+        <h2>${forcePasswordChange ? "Yêu cầu đổi mật khẩu" : "Đổi mật khẩu"}</h2>
+        ${forcePasswordChange ? `<p class="notice">Tài khoản đang dùng mật khẩu mặc định 123456. Vui lòng đổi mật khẩu mới để tiếp tục sử dụng.</p>` : ""}
         <form id="passwordForm" class="form-grid">
           <label>Mật khẩu hiện tại <input name="currentPassword" type="password" /></label>
           <label>Mật khẩu mới <input name="newPassword" type="password" /></label>
@@ -768,7 +773,7 @@ function renderProfile() {
           <div id="passwordMessage"></div>
         </form>
       </section>
-      <section class="panel span-6">
+      <section class="panel span-6 ${forcePasswordChange ? "hidden-panel" : ""}">
         <h2>Liên kết Telegram</h2>
         <form id="telegramProfileForm" class="form-grid">
           <label>Telegram Chat ID <input name="telegramChatId" value="${state.user.telegramChatId || ""}" /></label>
@@ -792,19 +797,22 @@ function renderProfile() {
       setMessage("#passwordMessage", err.message, "error");
     }
   });
-  document.querySelector("#telegramProfileForm").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    try {
-      await api("/api/profile/telegram", {
-        method: "POST",
-        body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget))),
-      });
-      await loadBootstrap();
-      setMessage("#profileTelegramMessage", "Đã lưu Telegram Chat ID.", "success");
-    } catch (err) {
-      setMessage("#profileTelegramMessage", err.message, "error");
-    }
-  });
+  const telegramForm = document.querySelector("#telegramProfileForm");
+  if (telegramForm) {
+    telegramForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      try {
+        await api("/api/profile/telegram", {
+          method: "POST",
+          body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget))),
+        });
+        await loadBootstrap();
+        setMessage("#profileTelegramMessage", "Đã lưu Telegram Chat ID.", "success");
+      } catch (err) {
+        setMessage("#profileTelegramMessage", err.message, "error");
+      }
+    });
+  }
 }
 
 init().catch((err) => {

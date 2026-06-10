@@ -503,6 +503,9 @@ async function api(req, res) {
       if (!user) return;
       const body = await readBody(req);
       const db = readDb();
+      if (user.role === "worker" && user.mustChangePassword) {
+        return json(res, 403, { error: "Vui lòng đổi mật khẩu mặc định trước khi đăng ký cơm" });
+      }
       const lock = isWorkerRegistrationLocked(db, user);
       if (lock.locked && user.role === "worker") {
         return json(res, 423, { error: `Tai khoan bi khoa dang ky. ${lock.reason}` });
@@ -555,6 +558,9 @@ async function api(req, res) {
       if (!user) return;
       const body = await readBody(req);
       const db = readDb();
+      if (user.role === "worker" && user.mustChangePassword) {
+        return json(res, 403, { error: "Vui lòng đổi mật khẩu mặc định trước khi thao tác" });
+      }
       const employeeCode = user.role === "worker" ? user.employeeCode : String(body.employeeCode || "");
       const mealDate = String(body.mealDate || "").slice(0, 10);
       const shift = normalizeShift(body.shift);
