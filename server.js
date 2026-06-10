@@ -407,6 +407,7 @@ async function api(req, res) {
         user: { ...sanitizeUser(user), registrationLockedNow: lock.locked, lockReasonNow: lock.reason || "" },
         settings: db.settings,
         users: user.role === "worker" ? [] : db.users.map(sanitizeUser),
+        chefs: db.chefs || [],
         menus: db.menus.sort((a, b) => `${a.mealDate}${a.shift}`.localeCompare(`${b.mealDate}${b.shift}`)),
       });
     }
@@ -468,6 +469,45 @@ async function api(req, res) {
       return json(res, 200, { ok: true });
     }
 
+    if (route === "POST /api/admin/chefs") {
+      const user = requireRole(req, res, ["admin"]);
+      if (!user) return;
+      const body = await readBody(req);
+      const db = readDb();
+      db.chefs = db.chefs || [];
+      const fullName = String(body.fullName || "").trim();
+      const phone = String(body.phone || "").trim();
+      if (!fullName || !phone) return json(res, 400, { error: "Can nhap ho ten va so dien thoai dau bep" });
+      let chef = db.chefs.find((item) => item.phone === phone);
+      if (!chef) {
+        chef = { id: crypto.randomUUID(), createdAt: nowIso() };
+        db.chefs.push(chef);
+      }
+      Object.assign(chef, { fullName, phone, updatedAt: nowIso(), updatedBy: user.employeeCode });
+      audit(db, user, "UPSERT_CHEF", { chefId: chef.id, phone });
+      writeDb(db);
+      return json(res, 200, { chef });
+    }
+
+    if (route === "POST /api/admin/delete-chef") {
+      const user = requireRole(req, res, ["admin"]);
+      if (!user) return;
+      const body = await readBody(req);
+      const db = readDb();
+      db.chefs = db.chefs || [];
+      const id = String(body.id || "");
+      const chef = db.chefs.find((item) => item.id === id);
+      if (!chef) return json(res, 404, { error: "Khong tim thay dau bep" });
+      db.chefs = db.chefs.filter((item) => item.id !== id);
+      for (const menu of db.menus) {
+        menu.chefIds = (menu.chefIds || []).filter((chefId) => chefId !== id);
+        menu.chefs = (menu.chefs || []).filter((item) => item.id !== id);
+      }
+      audit(db, user, "DELETE_CHEF", { chefId: id, phone: chef.phone });
+      writeDb(db);
+      return json(res, 200, { ok: true });
+    }
+
     if (route === "POST /api/profile/change-password") {
       const user = requireUser(req, res);
       if (!user) return;
@@ -507,6 +547,10 @@ async function api(req, res) {
       const items = Array.isArray(body.items) ? body.items : parseMenuItems(body.itemsText || body.dishes);
       const totalMenuValue = menuTotal(items);
       const price = totalMenuValue || Number(body.price || db.settings.defaultMealPrice);
+      const chefIds = Array.isArray(body.chefIds) ? body.chefIds.map(String) : [];
+      const selectedChefs = (db.chefs || [])
+        .filter((chef) => chefIds.includes(chef.id))
+        .map((chef) => ({ id: chef.id, fullName: chef.fullName, phone: chef.phone }));
       let menu = getMenu(db, mealDate, shift);
       if (!menu) {
         menu = { id: crypto.randomUUID(), mealDate, shift };
@@ -515,6 +559,8 @@ async function api(req, res) {
       Object.assign(menu, {
         dishes: items.map((item) => item.name).join(", "),
         items,
+        chefIds: selectedChefs.map((chef) => chef.id),
+        chefs: selectedChefs,
         totalMenuValue,
         plannedQty: Number(body.plannedQty || 0),
         price,

@@ -6,7 +6,9 @@ const state = {
   users: [],
   menus: [],
   orders: [],
+  chefs: [],
   tab: "worker",
+  adminTab: "members",
   kitchenTab: "menu",
 };
 
@@ -217,6 +219,12 @@ function renderMenuItemsTable(items, compact = false) {
   `;
 }
 
+function chefNames(menu) {
+  const chefs = menu && Array.isArray(menu.chefs) ? menu.chefs : [];
+  if (!chefs.length) return "Chưa chọn";
+  return chefs.map((chef) => `${chef.fullName}${chef.phone ? ` (${chef.phone})` : ""}`).join(", ");
+}
+
 function defaultMenuRows() {
   return [
     { seq: 1, name: "Cơm", grams: 250, unitPrice: 20 },
@@ -297,7 +305,36 @@ function populateMenuInputRows() {
   rows.forEach((row) => addMenuInputRow(row));
   form.elements.plannedQty.value = existing ? existing.plannedQty || 0 : 300;
   form.elements.note.value = existing ? existing.note || "" : "";
+  populateChefChecks(existing ? existing.chefIds || [] : []);
   updateMenuInputTotals();
+}
+
+function renderChefChecklist(selectedIds = []) {
+  if (!state.chefs.length) {
+    return `<p class="muted">Admin chưa nhập danh sách đầu bếp.</p>`;
+  }
+  const selected = new Set(selectedIds);
+  return html`
+    <div class="check-list">
+      ${state.chefs
+        .map(
+          (chef) => `<label class="check-item">
+            <input type="checkbox" data-chef-check value="${chef.id}" ${selected.has(chef.id) ? "checked" : ""} />
+            <span>${chef.fullName} - ${chef.phone || ""}</span>
+          </label>`
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function populateChefChecks(selectedIds = []) {
+  const target = document.querySelector("#chefChecklist");
+  if (target) target.innerHTML = renderChefChecklist(selectedIds);
+}
+
+function collectSelectedChefIds() {
+  return [...document.querySelectorAll("[data-chef-check]:checked")].map((input) => input.value);
 }
 
 async function loadOrders(date = "") {
@@ -326,8 +363,14 @@ function renderAdmin() {
   const workers = state.users.filter((u) => u.role === "worker");
   const view = document.querySelector("#view");
   view.innerHTML = html`
+    <div class="subtabs">
+      <button class="tab ${state.adminTab === "members" ? "active" : ""}" data-admin-tab="members">Thành viên</button>
+      <button class="tab ${state.adminTab === "chefs" ? "active" : ""}" data-admin-tab="chefs">Đầu bếp</button>
+    </div>
     <div class="grid">
-      <section class="panel span-6">
+      ${
+        state.adminTab === "members"
+          ? html`<section class="panel span-6">
         <h2>Nhập danh sách thành viên từ Excel</h2>
         <p class="muted">Chọn file Excel .xlsx theo mẫu gồm các cột: Số thứ tự, Họ và tên, Bộ phận, Số điện thoại. Sau khi nhập, số điện thoại sẽ là tài khoản đăng nhập của thành viên, mật khẩu mặc định là 123456.</p>
         <p><a href="/templates/Mau_nhap_danh_sach_cong_nhan.xlsx" download>Tải file mẫu Excel</a></p>
@@ -364,12 +407,55 @@ function renderAdmin() {
           </table>
         </div>
       </section>
+      `
+          : html`<section class="panel span-5">
+        <h2>Nhập danh sách đầu bếp</h2>
+        <p class="muted">Danh sách này dùng để chọn người thực hiện khi nhập định lượng suất ăn.</p>
+        <form id="chefForm" class="form-grid">
+          <label>Họ và tên <input name="fullName" /></label>
+          <label>Số điện thoại <input name="phone" /></label>
+          <button>Thêm / cập nhật đầu bếp</button>
+          <div id="chefMessage"></div>
+        </form>
+      </section>
+      <section class="panel span-7">
+        <h2>Danh sách đầu bếp</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>STT</th><th>Họ và tên</th><th>Số điện thoại</th><th></th></tr></thead>
+            <tbody>
+              ${(state.chefs || [])
+                .map(
+                  (chef, index) => `<tr>
+                    <td>${index + 1}</td><td>${chef.fullName}</td><td>${chef.phone || ""}</td>
+                    <td><button class="danger" data-delete-chef="${chef.id}">Xóa</button></td>
+                  </tr>`
+                )
+                .join("")}
+            </tbody>
+          </table>
+        </div>
+      </section>`
+      }
     </div>
   `;
-  document.querySelector("#importWorkersBtn").addEventListener("click", importWorkers);
-  document.querySelectorAll("[data-delete-worker]").forEach((btn) => {
-    btn.addEventListener("click", () => deleteWorker(btn.dataset.deleteWorker));
+  document.querySelectorAll("[data-admin-tab]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.adminTab = btn.dataset.adminTab;
+      renderAdmin();
+    });
   });
+  if (state.adminTab === "members") {
+    document.querySelector("#importWorkersBtn").addEventListener("click", importWorkers);
+    document.querySelectorAll("[data-delete-worker]").forEach((btn) => {
+      btn.addEventListener("click", () => deleteWorker(btn.dataset.deleteWorker));
+    });
+  } else {
+    document.querySelector("#chefForm").addEventListener("submit", saveChef);
+    document.querySelectorAll("[data-delete-chef]").forEach((btn) => {
+      btn.addEventListener("click", () => deleteChef(btn.dataset.deleteChef));
+    });
+  }
 }
 
 async function importWorkers() {
@@ -396,6 +482,30 @@ async function deleteWorker(employeeCode) {
       method: "POST",
       body: JSON.stringify({ employeeCode }),
     });
+    await loadBootstrap();
+    renderAdmin();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function saveChef(event) {
+  event.preventDefault();
+  try {
+    const body = Object.fromEntries(new FormData(event.currentTarget));
+    await api("/api/admin/chefs", { method: "POST", body: JSON.stringify(body) });
+    await loadBootstrap();
+    renderAdmin();
+    setMessage("#chefMessage", "Đã lưu đầu bếp.", "success");
+  } catch (err) {
+    setMessage("#chefMessage", err.message, "error");
+  }
+}
+
+async function deleteChef(id) {
+  if (!confirm("Xóa đầu bếp này?")) return;
+  try {
+    await api("/api/admin/delete-chef", { method: "POST", body: JSON.stringify({ id }) });
     await loadBootstrap();
     renderAdmin();
   } catch (err) {
@@ -451,6 +561,7 @@ function renderMealCard(date, shift, disabled) {
     <article class="panel span-6">
       <h3>Ca ${shiftLabel(shift)}</h3>
       ${menu ? renderMenuItemsTable(menu.items || [], true) : "<p>Nhà bếp chưa nhập thực đơn.</p>"}
+      ${menu ? `<p class="muted"><strong>Đầu bếp:</strong> ${chefNames(menu)}</p>` : ""}
       <p class="muted">Đơn giá suất ăn: ${money(menu ? menu.price : state.settings.defaultMealPrice)}</p>
       <p>${statusBadge(order)}</p>
       <div class="actions">
@@ -513,6 +624,10 @@ function renderKitchen() {
                 <option value="dinner">Tối</option>
               </select>
             </label>
+          </div>
+          <div>
+            <label>Đầu bếp</label>
+            <div id="chefChecklist">${renderChefChecklist()}</div>
           </div>
           <div>
             <label>Danh sách món ăn theo định lượng</label>
@@ -585,6 +700,7 @@ function renderKitchen() {
       try {
         const body = Object.fromEntries(new FormData(event.currentTarget));
         body.items = collectMenuInputRows();
+        body.chefIds = collectSelectedChefIds();
         body.price = menuItemsTotal(body.items);
         await api("/api/menus", { method: "POST", body: JSON.stringify(body) });
         await loadBootstrap();

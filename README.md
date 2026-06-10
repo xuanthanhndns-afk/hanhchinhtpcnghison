@@ -36,7 +36,9 @@ Mo trinh duyet: `http://localhost:3000`
 ## Module co san
 
 - Admin nhap danh sach cong nhan tu file Excel luu dang CSV, xem/xoa tai khoan cong nhan, quan ly dong tien tung account.
+- Admin quan ly danh sach dau bep gom ho ten va so dien thoai.
 - Nha bep nhap/sua dinh luong tung mon an theo bua bang cac o co san: so thu tu, ten mon, dinh luong gam, don gia/gam. He thong tu tinh thanh tien tung mon va tong gia tien moi suat.
+- Khi nhap dinh luong suat an, co the chon mot hoac nhieu dau bep thuc hien bua an.
 - Cong nhan dang ky/huy truoc 08h ngay an.
 - Sau 08h chi nha bep duoc bo sung suat theo ma nhan vien.
 - Cong nhan da dang ky nhung khong an van tinh tien.

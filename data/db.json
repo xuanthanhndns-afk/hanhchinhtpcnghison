@@ -87,6 +87,24 @@
       "telegramChatId": ""
     }
   ],
+  "chefs": [
+    {
+      "id": "chef-001",
+      "fullName": "Nguyen Van Bep",
+      "phone": "0912000001",
+      "createdAt": "2026-06-10T00:00:00.000Z",
+      "updatedAt": "2026-06-10T00:00:00.000Z",
+      "updatedBy": "admin"
+    },
+    {
+      "id": "chef-002",
+      "fullName": "Tran Thi Bep",
+      "phone": "0912000002",
+      "createdAt": "2026-06-10T00:00:00.000Z",
+      "updatedAt": "2026-06-10T00:00:00.000Z",
+      "updatedBy": "admin"
+    }
+  ],
   "menus": [
     {
       "id": "m-2026-06-11-lunch",
