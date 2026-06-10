@@ -56,6 +56,18 @@ function setMessage(target, text, kind = "") {
   if (el) el.innerHTML = text ? `<p class="${kind}">${text}</p>` : "";
 }
 
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      resolve(result.includes(",") ? result.split(",").pop() : result);
+    };
+    reader.onerror = () => reject(new Error("Không đọc được file Excel."));
+    reader.readAsDataURL(file);
+  });
+}
+
 async function loadBootstrap() {
   const data = await api("/api/bootstrap");
   Object.assign(state, data);
@@ -313,10 +325,12 @@ function renderAdmin() {
   view.innerHTML = html`
     <div class="grid">
       <section class="panel span-6">
-        <h2>Nhập danh sách công nhân từ Excel</h2>
-        <p class="muted">Trong Excel, dùng file mẫu có các cột: Số thứ tự, Họ và tên, Bộ phận, Số điện thoại. Sau khi nhập, số điện thoại sẽ là tài khoản đăng nhập của công nhân, mật khẩu mặc định là 123456.</p>
-        <textarea id="workerCsv">Số thứ tự,Họ và tên,Bộ phận,Số điện thoại
-1,Phạm Văn D,Vận hành,0901000004</textarea>
+        <h2>Nhập danh sách thành viên từ Excel</h2>
+        <p class="muted">Chọn file Excel .xlsx theo mẫu gồm các cột: Số thứ tự, Họ và tên, Bộ phận, Số điện thoại. Sau khi nhập, số điện thoại sẽ là tài khoản đăng nhập của thành viên, mật khẩu mặc định là 123456.</p>
+        <p><a href="/templates/Mau_nhap_danh_sach_cong_nhan.xlsx" download>Tải file mẫu Excel</a></p>
+        <label>File danh sách thành viên
+          <input id="workerXlsx" type="file" accept=".xlsx,.xls" />
+        </label>
         <div class="actions">
           <button id="importWorkersBtn">Nhập danh sách</button>
         </div>
@@ -324,12 +338,12 @@ function renderAdmin() {
       </section>
       <section class="panel span-6">
         <h2>Thông tin hệ thống</h2>
-        <p><strong>Tổng công nhân:</strong> ${workers.length}</p>
+        <p><strong>Tổng thành viên:</strong> ${workers.length}</p>
         <p><strong>Tài khoản quản lý:</strong> admin, Nhabep</p>
-        <p class="muted">Admin có thể xem toàn bộ tài khoản, xóa công nhân và quản lý dòng tiền trong tab Dòng tiền.</p>
+        <p class="muted">Admin có thể xem toàn bộ tài khoản, xóa thành viên và quản lý dòng tiền trong tab Dòng tiền.</p>
       </section>
       <section class="panel span-12">
-        <h2>Danh sách tài khoản công nhân</h2>
+        <h2>Danh sách tài khoản thành viên</h2>
         <div class="table-wrap">
           <table>
             <thead><tr><th>STT</th><th>Họ và tên</th><th>Bộ phận</th><th>Số điện thoại</th><th>Telegram</th><th>Trạng thái</th><th>Khóa đăng ký</th><th></th></tr></thead>
@@ -357,10 +371,12 @@ function renderAdmin() {
 
 async function importWorkers() {
   try {
-    const csv = document.querySelector("#workerCsv").value;
+    const file = document.querySelector("#workerXlsx").files[0];
+    if (!file) throw new Error("Vui lòng chọn file Excel .xlsx theo mẫu.");
+    const fileBase64 = await fileToBase64(file);
     const data = await api("/api/admin/import-workers", {
       method: "POST",
-      body: JSON.stringify({ csv }),
+      body: JSON.stringify({ fileName: file.name, fileBase64 }),
     });
     await loadBootstrap();
     renderAdmin();
@@ -371,7 +387,7 @@ async function importWorkers() {
 }
 
 async function deleteWorker(employeeCode) {
-  if (!confirm(`Xóa công nhân ${employeeCode}?`)) return;
+  if (!confirm(`Xóa thành viên ${employeeCode}?`)) return;
   try {
     await api("/api/admin/delete-worker", {
       method: "POST",

@@ -2,10 +2,12 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const XLSX = require("xlsx");
 
 const PORT = Number(process.env.PORT || 3000);
 const DATA_FILE = path.join(__dirname, "data", "db.json");
 const PUBLIC_DIR = path.join(__dirname, "public");
+const TEMPLATES_DIR = path.join(__dirname, "templates");
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 
 const sessions = new Map();
@@ -134,7 +136,7 @@ function readBody(req) {
     let raw = "";
     req.on("data", (chunk) => {
       raw += chunk;
-      if (raw.length > 5_000_000) {
+      if (raw.length > 15_000_000) {
         reject(new Error("Body qua lon"));
         req.destroy();
       }
@@ -268,6 +270,15 @@ function parseCsv(raw) {
   });
 }
 
+function parseXlsxBase64(fileBase64) {
+  const buffer = Buffer.from(String(fileBase64 || ""), "base64");
+  if (!buffer.length) return [];
+  const workbook = XLSX.read(buffer, { type: "buffer", cellDates: false, raw: false });
+  const sheetName = workbook.SheetNames[0];
+  if (!sheetName) return [];
+  return XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: "", raw: false });
+}
+
 function normalizeHeader(value) {
   return String(value || "")
     .trim()
@@ -327,8 +338,11 @@ async function sendTelegram(chatId, text) {
 
 function serveStatic(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
-  let filePath = path.join(PUBLIC_DIR, url.pathname === "/" ? "index.html" : url.pathname);
-  if (!filePath.startsWith(PUBLIC_DIR)) return sendText(res, 403, "Forbidden");
+  const isTemplate = url.pathname.startsWith("/templates/");
+  const rootDir = isTemplate ? TEMPLATES_DIR : PUBLIC_DIR;
+  const relativePath = isTemplate ? url.pathname.replace(/^\/templates\//, "") : url.pathname === "/" ? "index.html" : url.pathname;
+  let filePath = path.join(rootDir, relativePath);
+  if (!filePath.startsWith(rootDir)) return sendText(res, 403, "Forbidden");
   const ext = path.extname(filePath).toLowerCase();
   const type =
     ext === ".html"
@@ -341,6 +355,10 @@ function serveStatic(req, res) {
       ? "image/jpeg"
       : ext === ".png"
       ? "image/png"
+      : ext === ".xlsx"
+      ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      : ext === ".csv"
+      ? "text/csv; charset=utf-8"
       : "application/octet-stream";
   fs.readFile(filePath, (err, data) => {
     if (err) return sendText(res, 404, "Not found");
@@ -398,7 +416,7 @@ async function api(req, res) {
       if (!user) return;
       const body = await readBody(req);
       const db = readDb();
-      const rows = parseCsv(String(body.csv || ""));
+      const rows = body.fileBase64 ? parseXlsxBase64(body.fileBase64) : parseCsv(String(body.csv || ""));
       let created = 0;
       let updated = 0;
       for (const row of rows) {

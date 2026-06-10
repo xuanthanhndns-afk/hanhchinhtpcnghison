@@ -73,14 +73,14 @@ node server.js
 
 Trong danh sach user, moi cong nhan can co `telegramChatId`.
 
-## Mau file Excel/CSV nhap cong nhan
+## Mau file Excel nhap thanh vien
 
 Co file mau trong thu muc `templates`:
 
 - `templates/Mau_nhap_danh_sach_cong_nhan.xlsx`
 - `templates/Mau_nhap_danh_sach_cong_nhan.csv`
 
-Trong Excel, tao cac cot sau roi Save As CSV. He thong se tu dung so dien thoai lam tai khoan dang nhap va mat khau mac dinh la `123456`:
+Admin co the chon truc tiep file `.xlsx` theo mau de nhap danh sach. He thong se tu dung so dien thoai lam tai khoan dang nhap va mat khau mac dinh la `123456`:
 
 ```csv
 So thu tu,Ho va ten,Bo phan,So dien thoai
