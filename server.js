@@ -404,8 +404,7 @@ async function api(req, res) {
       for (const row of rows) {
         const phone = pick(row, ["phone", "sodienthoai", "so dien thoai", "số điện thoại", "dien thoai", "sdt"]);
         const employeeCode = pick(row, ["employeeCode", "manv", "ma nv", "ma nhan vien"]) || phone;
-        const fullName = pick(row, ["fullName", "hoten", "ho ten", "họ tên", "ten"]);
-        const birthYear = pick(row, ["birthYear", "namsinh", "nam sinh", "năm sinh"]);
+        const fullName = pick(row, ["fullName", "hoten", "ho ten", "họ tên", "họ và tên", "ten"]);
         if (!phone || !fullName) continue;
         let worker = db.users.find((u) => u.role === "worker" && (u.phone === phone || u.employeeCode === employeeCode));
         if (!worker) {
@@ -429,7 +428,6 @@ async function api(req, res) {
           employeeCode,
           phone,
           fullName,
-          birthYear: birthYear || worker.birthYear || "",
           department: pick(row, ["department", "bophan", "bo phan", "bộ phận", "phong ban"]) || worker.department || "",
         });
       }

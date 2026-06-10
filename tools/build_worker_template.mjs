@@ -13,11 +13,11 @@ await fs.mkdir(templatesDir, { recursive: true });
 const workbook = Workbook.create();
 const sheet = workbook.worksheets.add("Danh sach CBCNV");
 
-sheet.getRange("A1:D1").values = [["Họ tên", "Năm sinh", "Số điện thoại", "Bộ phận"]];
+sheet.getRange("A1:D1").values = [["Số thứ tự", "Họ và tên", "Bộ phận", "Số điện thoại"]];
 sheet.getRange("A2:D4").values = [
-  ["Nguyễn Văn A", "1990", "0901000001", "May 1"],
-  ["Trần Thị B", "1992", "0901000002", "May 2"],
-  ["Lê Văn C", "1988", "0901000003", "Cơ điện"],
+  [1, "Nguyễn Văn A", "May 1", "0901000001"],
+  [2, "Trần Thị B", "May 2", "0901000002"],
+  [3, "Lê Văn C", "Cơ điện", "0901000003"],
 ];
 
 const header = sheet.getRange("A1:D1");
@@ -27,7 +27,7 @@ header.format.horizontalAlignment = "center";
 
 sheet.getRange("A1:D4").format.borders = { preset: "all", style: "thin", color: "#D9E0EA" };
 sheet.getRange("A:D").format.columnWidthPx = 170;
-sheet.getRange("C:C").format.numberFormat = "@";
+sheet.getRange("D:D").format.numberFormat = "@";
 sheet.getRange("A1:D4").format.rowHeightPx = 26;
 
 const output = await SpreadsheetFile.exportXlsx(workbook);

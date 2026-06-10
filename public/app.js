@@ -314,9 +314,9 @@ function renderAdmin() {
     <div class="grid">
       <section class="panel span-6">
         <h2>Nhập danh sách công nhân từ Excel</h2>
-        <p class="muted">Trong Excel, dùng file mẫu có các cột: Họ tên, Năm sinh, Số điện thoại, Bộ phận. Khi nhập vào hệ thống, chọn Save As CSV rồi dán nội dung vào ô dưới đây.</p>
-        <textarea id="workerCsv">Họ tên,Năm sinh,Số điện thoại,Bộ phận
-Phạm Văn D,1991,0901000004,Vận hành</textarea>
+        <p class="muted">Trong Excel, dùng file mẫu có các cột: Số thứ tự, Họ và tên, Bộ phận, Số điện thoại. Sau khi nhập, số điện thoại sẽ là tài khoản đăng nhập của công nhân, mật khẩu mặc định là 123456.</p>
+        <textarea id="workerCsv">Số thứ tự,Họ và tên,Bộ phận,Số điện thoại
+1,Phạm Văn D,Vận hành,0901000004</textarea>
         <div class="actions">
           <button id="importWorkersBtn">Nhập danh sách</button>
         </div>
@@ -332,12 +332,12 @@ Phạm Văn D,1991,0901000004,Vận hành</textarea>
         <h2>Danh sách tài khoản công nhân</h2>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Mã NV</th><th>Số điện thoại</th><th>Họ tên</th><th>Năm sinh</th><th>Bộ phận</th><th>Telegram</th><th>Trạng thái</th><th>Khóa đăng ký</th><th></th></tr></thead>
+            <thead><tr><th>STT</th><th>Họ và tên</th><th>Bộ phận</th><th>Số điện thoại</th><th>Telegram</th><th>Trạng thái</th><th>Khóa đăng ký</th><th></th></tr></thead>
             <tbody>
               ${workers
                 .map(
-                  (u) => `<tr>
-                    <td>${u.employeeCode}</td><td>${u.phone || ""}</td><td>${u.fullName}</td><td>${u.birthYear || ""}</td><td>${u.department}</td><td>${u.telegramChatId || ""}</td>
+                  (u, index) => `<tr>
+                    <td>${index + 1}</td><td>${u.fullName}</td><td>${u.department}</td><td>${u.phone || ""}</td><td>${u.telegramChatId || ""}</td>
                     <td>${u.status}</td><td>${u.registrationLocked ? "Đang khóa" : "Mở"}</td>
                     <td><button class="danger" data-delete-worker="${u.employeeCode}">Xóa</button></td>
                   </tr>`
@@ -795,7 +795,6 @@ function renderProfile(forcePasswordChange = false) {
         <h2>Thông tin tài khoản</h2>
         <p><strong>Họ tên:</strong> ${state.user.fullName}</p>
         <p><strong>Mã NV:</strong> ${state.user.employeeCode}</p>
-        <p><strong>Năm sinh:</strong> ${state.user.birthYear || ""}</p>
         <p><strong>Bộ phận công tác:</strong> ${state.user.department || ""}</p>
         <p><strong>Số điện thoại đăng nhập:</strong> ${state.user.phone || ""}</p>
         <p><strong>Telegram Chat ID:</strong> ${state.user.telegramChatId || "Chưa liên kết"}</p>

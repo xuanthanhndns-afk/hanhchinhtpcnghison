@@ -1,4 +1,4 @@
-Họ tên,Năm sinh,Số điện thoại,Bộ phận
-Nguyễn Văn A,1990,0901000001,May 1
-Trần Thị B,1992,0901000002,May 2
-Lê Văn C,1988,0901000003,Cơ điện
+Số thứ tự,Họ và tên,Bộ phận,Số điện thoại
+1,Nguyễn Văn A,May 1,0901000001
+2,Trần Thị B,May 2,0901000002
+3,Lê Văn C,Cơ điện,0901000003

@@ -83,9 +83,9 @@ Co file mau trong thu muc `templates`:
 Trong Excel, tao cac cot sau roi Save As CSV. He thong se tu dung so dien thoai lam tai khoan dang nhap va mat khau mac dinh la `123456`:
 
 ```csv
-Ho ten,Nam sinh,So dien thoai,Bo phan
-Nguyen Van A,1990,0901000001,May 1
-Tran Thi B,1992,0901000002,May 2
+So thu tu,Ho va ten,Bo phan,So dien thoai
+1,Nguyen Van A,May 1,0901000001
+2,Tran Thi B,May 2,0901000002
 ```
 
 ## Mau CSV sao ke
