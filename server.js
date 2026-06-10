@@ -574,9 +574,15 @@ async function api(req, res) {
       const totalMenuValue = menuTotal(items);
       const price = totalMenuValue || Number(body.price || db.settings.defaultMealPrice);
       const chefIds = Array.isArray(body.chefIds) ? body.chefIds.map(String) : [];
+      if (!chefIds.length) {
+        return json(res, 400, { error: "Vui long chon it nhat mot dau bep truoc khi luu dinh luong bua an" });
+      }
       const selectedChefs = (db.chefs || [])
         .filter((chef) => chefIds.includes(chef.id))
         .map((chef) => ({ id: chef.id, fullName: chef.fullName, phone: chef.phone }));
+      if (!selectedChefs.length) {
+        return json(res, 400, { error: "Danh sach dau bep khong hop le. Vui long chon lai dau bep." });
+      }
       let menu = getMenu(db, mealDate, shift);
       if (!menu) {
         menu = { id: crypto.randomUUID(), mealDate, shift };

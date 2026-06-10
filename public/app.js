@@ -338,6 +338,13 @@ function collectSelectedChefIds() {
   return [...document.querySelectorAll("[data-chef-check]:checked")].map((input) => input.value);
 }
 
+function validateSelectedChefs() {
+  if (collectSelectedChefIds().length) return true;
+  setMessage("#menuMessage", "Vui lòng chọn ít nhất một đầu bếp thực hiện trước khi lưu định lượng bữa ăn.", "error");
+  document.querySelector("#chefChecklist")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  return false;
+}
+
 async function loadOrders(date = "") {
   const data = await api(`/api/orders${date ? `?mealDate=${encodeURIComponent(date)}` : ""}`);
   state.orders = data.orders;
@@ -718,6 +725,7 @@ function renderKitchen() {
     document.querySelector("#menuForm").addEventListener("submit", async (event) => {
       event.preventDefault();
       try {
+        if (!validateSelectedChefs()) return;
         const body = Object.fromEntries(new FormData(event.currentTarget));
         body.items = collectMenuInputRows();
         body.chefIds = collectSelectedChefIds();
