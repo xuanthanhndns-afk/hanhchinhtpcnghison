@@ -45,6 +45,11 @@ button:hover {
   background: var(--accent-dark);
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 button.secondary {
   background: #e8edf3;
   color: var(--ink);
@@ -107,6 +112,14 @@ label {
   min-width: 0;
 }
 
+.brand-logo {
+  width: 180px;
+  max-width: 38vw;
+  height: 48px;
+  object-fit: contain;
+  object-position: left center;
+}
+
 .mark {
   width: 36px;
   height: 36px;
@@ -148,6 +161,13 @@ label {
 .login h1 {
   margin: 0 0 8px;
   font-size: 24px;
+}
+
+.login-logo {
+  display: block;
+  width: min(100%, 360px);
+  height: auto;
+  margin: 0 auto 18px;
 }
 
 .login form,
@@ -317,6 +337,13 @@ tr:last-child td {
   background: #fff8e6;
   color: #755500;
   border: 1px solid #f1d28a;
+  margin-bottom: 14px;
+}
+
+.bad-notice {
+  background: #fff0ee;
+  color: var(--bad);
+  border-color: #f0b8b2;
 }
 
 .error {
@@ -331,6 +358,11 @@ tr:last-child td {
   .topbar {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .brand-logo {
+    width: 150px;
+    max-width: 60vw;
   }
 
   .main {

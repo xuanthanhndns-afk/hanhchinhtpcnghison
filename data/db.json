@@ -2,6 +2,7 @@
   "settings": {
     "cutoffTime": "08:00",
     "defaultMealPrice": 25000,
+    "paymentGraceDays": 5,
     "payment": {
       "bankBin": "970436",
       "accountNo": "0123456789",
@@ -18,6 +19,11 @@
       "department": "Admin",
       "role": "admin",
       "status": "active",
+      "phone": "admin",
+      "mustChangePassword": true,
+      "registrationLocked": false,
+      "lockedReason": "",
+      "lockedAt": "",
       "telegramChatId": ""
     },
     {
@@ -28,6 +34,11 @@
       "department": "Bep an",
       "role": "kitchen",
       "status": "active",
+      "phone": "kitchen",
+      "mustChangePassword": false,
+      "registrationLocked": false,
+      "lockedReason": "",
+      "lockedAt": "",
       "telegramChatId": ""
     },
     {
@@ -38,6 +49,11 @@
       "department": "Ke toan",
       "role": "accountant",
       "status": "active",
+      "phone": "accountant",
+      "mustChangePassword": false,
+      "registrationLocked": false,
+      "lockedReason": "",
+      "lockedAt": "",
       "telegramChatId": ""
     },
     {
@@ -48,6 +64,11 @@
       "department": "May 1",
       "role": "worker",
       "status": "active",
+      "phone": "0901000001",
+      "mustChangePassword": true,
+      "registrationLocked": false,
+      "lockedReason": "",
+      "lockedAt": "",
       "telegramChatId": ""
     },
     {
@@ -58,6 +79,11 @@
       "department": "May 2",
       "role": "worker",
       "status": "active",
+      "phone": "0901000002",
+      "mustChangePassword": false,
+      "registrationLocked": false,
+      "lockedReason": "",
+      "lockedAt": "",
       "telegramChatId": ""
     },
     {
@@ -68,6 +94,11 @@
       "department": "Co dien",
       "role": "worker",
       "status": "active",
+      "phone": "0901000003",
+      "mustChangePassword": true,
+      "registrationLocked": false,
+      "lockedReason": "",
+      "lockedAt": "",
       "telegramChatId": ""
     }
   ],

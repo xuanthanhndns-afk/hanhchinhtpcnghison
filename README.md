@@ -31,8 +31,8 @@ Mo trinh duyet: `http://localhost:3000`
 | Admin | admin | 123456 |
 | Nha bep | kitchen | 123456 |
 | Ke toan | accountant | 123456 |
-| Cong nhan | CN001 | 123456 |
-| Cong nhan | CN002 | 123456 |
+| Cong nhan | 0901000001 | 123456 |
+| Cong nhan | 0901000002 | 123456 |
 
 ## Module co san
 
@@ -44,6 +44,8 @@ Mo trinh duyet: `http://localhost:3000`
 - Tao link QR VietQR theo tung cong nhan.
 - Gui nhac Telegram neu cau hinh bot token va Telegram chat id.
 - Nhap sao ke CSV de doi soat tu dong theo so tien va noi dung chuyen khoan.
+- Cong nhan dang nhap bang so dien thoai va co the doi mat khau sau khi dang nhap.
+- Sau 5 ngay cua thang ke tiep, neu cong no chua thanh toan thi he thong nhac Telegram va khoa quyen dang ky com; khi thanh toan thanh cong se mo lai.
 
 ## Cau hinh thanh toan
 
@@ -77,11 +79,11 @@ File CSV can co cot:
 
 ```csv
 date,amount,description
-2026-07-01,625000,CN001 COM T06-2026
-2026-07-01,750000,CN002 COM T06-2026
+2026-07-01,625000,0901000001 COM T06-2026
+2026-07-01,750000,0901000002 COM T06-2026
 ```
 
 Doi soat se khop theo:
 
 - So tien dung bang cong no thang.
-- Noi dung co chua ma chuyen khoan: `CN001 COM T06-2026`.
+- Noi dung co chua ma chuyen khoan theo so dien thoai: `0901000001 COM T06-2026`.

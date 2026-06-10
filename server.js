@@ -78,6 +78,57 @@ function requireRole(req, res, roles) {
   return user;
 }
 
+function findUserByLogin(db, login) {
+  const value = String(login || "").trim().toLowerCase();
+  return db.users.find((u) => {
+    const byCode = String(u.employeeCode || "").toLowerCase() === value;
+    const byPhone = String(u.phone || "").toLowerCase() === value;
+    return byCode || byPhone;
+  });
+}
+
+function addMonths(month, offset) {
+  const [year, mm] = month.split("-").map(Number);
+  const date = new Date(year, mm - 1 + offset, 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function previousMonth() {
+  return addMonths(new Date().toISOString().slice(0, 7), -1);
+}
+
+function dueDateForMonth(month, graceDays) {
+  const [year, mm] = month.split("-").map(Number);
+  const due = new Date(year, mm, 1);
+  due.setDate(due.getDate() + Number(graceDays || 5));
+  return due;
+}
+
+function getOverdueDebt(db, employeeCode) {
+  const graceDays = Number(db.settings.paymentGraceDays || 5);
+  const months = new Set(db.orders.map((o) => o.mealDate.slice(0, 7)));
+  for (const month of [...months].sort()) {
+    if (new Date() <= dueDateForMonth(month, graceDays)) continue;
+    const debt = buildMonthlyDebts(db, month).find((d) => d.employeeCode === employeeCode);
+    if (debt && debt.status !== "paid" && debt.totalAmount > 0) return debt;
+  }
+  return null;
+}
+
+function isWorkerRegistrationLocked(db, user) {
+  if (!user || user.role !== "worker") return { locked: false };
+  if (user.registrationLocked) {
+    return { locked: true, reason: user.lockedReason || "Tai khoan dang bi khoa dang ky" };
+  }
+  const overdue = getOverdueDebt(db, user.employeeCode);
+  if (!overdue) return { locked: false };
+  return {
+    locked: true,
+    reason: `Con no tien com ${overdue.month}: ${overdue.totalAmount.toLocaleString("vi-VN")} dong`,
+    overdue,
+  };
+}
+
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let raw = "";
@@ -149,9 +200,9 @@ function activeBillableOrders(db, month) {
   });
 }
 
-function paymentCode(employeeCode, month) {
+function paymentCode(accountId, month) {
   const [year, mm] = month.split("-");
-  return `${employeeCode} COM T${mm}-${year}`;
+  return `${accountId} COM T${mm}-${year}`;
 }
 
 function buildVietQrUrl(settings, amount, content) {
@@ -178,7 +229,7 @@ function buildMonthlyDebts(db, month) {
       dinnerQty: 0,
       totalQty: 0,
       totalAmount: 0,
-      paymentCode: paymentCode(user.employeeCode, month),
+      paymentCode: paymentCode(user.phone || user.employeeCode, month),
       status: "unpaid",
       qrUrl: "",
     });
@@ -245,6 +296,10 @@ function serveStatic(req, res) {
       ? "text/css; charset=utf-8"
       : ext === ".js"
       ? "application/javascript; charset=utf-8"
+      : ext === ".jpg" || ext === ".jpeg"
+      ? "image/jpeg"
+      : ext === ".png"
+      ? "image/png"
       : "application/octet-stream";
   fs.readFile(filePath, (err, data) => {
     if (err) return sendText(res, 404, "Not found");
@@ -261,10 +316,10 @@ async function api(req, res) {
     if (route === "POST /api/login") {
       const body = await readBody(req);
       const db = readDb();
-      const code = String(body.employeeCode || "").trim();
-      const user = db.users.find(
-        (u) => u.employeeCode.toLowerCase() === code.toLowerCase() && u.password === body.password
-      );
+      const user = findUserByLogin(db, body.loginId || body.employeeCode || body.phone);
+      if (!user || user.password !== body.password) {
+        return json(res, 401, { error: "Sai tai khoan hoac mat khau" });
+      }
       if (!user || user.status !== "active") return json(res, 401, { error: "Sai tai khoan hoac mat khau" });
       const sid = crypto.randomUUID();
       sessions.set(sid, { userId: user.id, createdAt: Date.now() });
@@ -288,12 +343,42 @@ async function api(req, res) {
       const user = requireUser(req, res);
       if (!user) return;
       const db = readDb();
+      const lock = isWorkerRegistrationLocked(db, user);
       return json(res, 200, {
-        user: sanitizeUser(user),
+        user: { ...sanitizeUser(user), registrationLockedNow: lock.locked, lockReasonNow: lock.reason || "" },
         settings: db.settings,
         users: user.role === "worker" ? [] : db.users.map(sanitizeUser),
         menus: db.menus.sort((a, b) => `${a.mealDate}${a.shift}`.localeCompare(`${b.mealDate}${b.shift}`)),
       });
+    }
+
+    if (route === "POST /api/profile/change-password") {
+      const user = requireUser(req, res);
+      if (!user) return;
+      const body = await readBody(req);
+      const currentPassword = String(body.currentPassword || "");
+      const newPassword = String(body.newPassword || "");
+      if (user.password !== currentPassword) return json(res, 400, { error: "Mat khau hien tai khong dung" });
+      if (newPassword.length < 6) return json(res, 400, { error: "Mat khau moi can toi thieu 6 ky tu" });
+      const db = readDb();
+      const saved = db.users.find((u) => u.id === user.id);
+      saved.password = newPassword;
+      saved.mustChangePassword = false;
+      audit(db, saved, "CHANGE_PASSWORD", { employeeCode: saved.employeeCode });
+      writeDb(db);
+      return json(res, 200, { ok: true });
+    }
+
+    if (route === "POST /api/profile/telegram") {
+      const user = requireUser(req, res);
+      if (!user) return;
+      const body = await readBody(req);
+      const db = readDb();
+      const saved = db.users.find((u) => u.id === user.id);
+      saved.telegramChatId = String(body.telegramChatId || "").trim();
+      audit(db, saved, "UPDATE_TELEGRAM", { employeeCode: saved.employeeCode });
+      writeDb(db);
+      return json(res, 200, { user: sanitizeUser(saved) });
     }
 
     if (route === "POST /api/menus") {
@@ -327,6 +412,10 @@ async function api(req, res) {
       if (!user) return;
       const body = await readBody(req);
       const db = readDb();
+      const lock = isWorkerRegistrationLocked(db, user);
+      if (lock.locked && user.role === "worker") {
+        return json(res, 423, { error: `Tai khoan bi khoa dang ky. ${lock.reason}` });
+      }
       const employeeCode = user.role === "worker" ? user.employeeCode : String(body.employeeCode || "");
       if (user.role !== "worker" && !["admin", "kitchen"].includes(user.role)) {
         return json(res, 403, { error: "Khong co quyen dang ky ho" });
@@ -438,6 +527,17 @@ async function api(req, res) {
       return json(res, 200, { month, debts });
     }
 
+    if (route === "GET /api/reports/locked-users") {
+      const user = requireRole(req, res, ["admin", "accountant"]);
+      if (!user) return;
+      const db = readDb();
+      const rows = db.users
+        .filter((u) => u.role === "worker")
+        .map((u) => ({ user: sanitizeUser(u), lock: isWorkerRegistrationLocked(db, u) }))
+        .filter((r) => r.lock.locked);
+      return json(res, 200, { rows });
+    }
+
     if (route === "POST /api/payments/mark-paid") {
       const user = requireRole(req, res, ["admin", "accountant"]);
       if (!user) return;
@@ -460,6 +560,12 @@ async function api(req, res) {
         paidBy: user.employeeCode,
         method: body.method || "manual",
       });
+      const worker = db.users.find((u) => u.employeeCode === employeeCode);
+      if (worker) {
+        worker.registrationLocked = false;
+        worker.lockedReason = "";
+        worker.lockedAt = "";
+      }
       audit(db, user, "MARK_PAID", { month, employeeCode, amount: debt.totalAmount });
       writeDb(db);
       return json(res, 200, { ok: true });
@@ -502,6 +608,12 @@ async function api(req, res) {
             method: "bank_csv",
             bankStatementId: statement.id,
           });
+          const worker = db.users.find((u) => u.employeeCode === debt.employeeCode);
+          if (worker) {
+            worker.registrationLocked = false;
+            worker.lockedReason = "";
+            worker.lockedAt = "";
+          }
           matched.push({ statement, debt });
         } else {
           unmatched.push(statement);
@@ -522,9 +634,17 @@ async function api(req, res) {
       const results = [];
       for (const debt of debts) {
         const worker = db.users.find((u) => u.employeeCode === debt.employeeCode);
+        const overdue = new Date() > dueDateForMonth(month, db.settings.paymentGraceDays || 5);
+        if (overdue && worker) {
+          worker.registrationLocked = true;
+          worker.lockedReason = `Qua han thanh toan tien com ${month}`;
+          worker.lockedAt = nowIso();
+        }
         const text = `Anh/chi ${debt.fullName} co tien com thang ${month} la ${debt.totalAmount.toLocaleString(
           "vi-VN"
-        )} dong. Vui long chuyen khoan voi noi dung: ${debt.paymentCode}`;
+        )} dong. Vui long chuyen khoan voi noi dung: ${debt.paymentCode}${
+          overdue ? ". Tai khoan se bi khoa dang ky com den khi thanh toan thanh cong." : ""
+        }`;
         const result = await sendTelegram(worker ? worker.telegramChatId : "", text);
         results.push({ employeeCode: debt.employeeCode, result });
       }
