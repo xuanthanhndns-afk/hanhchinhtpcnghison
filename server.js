@@ -268,6 +268,36 @@ function parseCsv(raw) {
   });
 }
 
+function pick(row, names) {
+  const entries = Object.entries(row);
+  for (const name of names) {
+    const found = entries.find(([k]) => k.trim().toLowerCase() === name.toLowerCase());
+    if (found) return String(found[1] || "").trim();
+  }
+  return "";
+}
+
+function parseMenuItems(raw) {
+  return String(raw || "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line, index) => {
+      const parts = line.split(",").map((p) => p.trim());
+      const seq = Number(parts[0] || index + 1);
+      const name = parts[1] || "";
+      const grams = Number(String(parts[2] || "0").replace(/[^\d.-]/g, ""));
+      const unitPrice = Number(String(parts[3] || "0").replace(/[^\d.-]/g, ""));
+      const amount = Number(String(parts[4] || "").replace(/[^\d.-]/g, "")) || grams * unitPrice;
+      return { seq, name, grams, unitPrice, amount };
+    })
+    .filter((item) => item.name);
+}
+
+function menuTotal(items) {
+  return items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+}
+
 async function sendTelegram(chatId, text) {
   if (!TELEGRAM_BOT_TOKEN) {
     return { ok: false, skipped: true, reason: "Chua cau hinh TELEGRAM_BOT_TOKEN" };
@@ -352,6 +382,63 @@ async function api(req, res) {
       });
     }
 
+    if (route === "POST /api/admin/import-workers") {
+      const user = requireRole(req, res, ["admin"]);
+      if (!user) return;
+      const body = await readBody(req);
+      const db = readDb();
+      const rows = parseCsv(String(body.csv || ""));
+      let created = 0;
+      let updated = 0;
+      for (const row of rows) {
+        const phone = pick(row, ["phone", "sodienthoai", "so dien thoai", "dien thoai", "sdt"]);
+        const employeeCode = pick(row, ["employeeCode", "manv", "ma nv", "ma nhan vien"]) || phone;
+        const fullName = pick(row, ["fullName", "hoten", "ho ten", "ten"]);
+        if (!phone || !fullName) continue;
+        let worker = db.users.find((u) => u.role === "worker" && (u.phone === phone || u.employeeCode === employeeCode));
+        if (!worker) {
+          worker = {
+            id: crypto.randomUUID(),
+            role: "worker",
+            status: "active",
+            password: "123456",
+            mustChangePassword: true,
+            registrationLocked: false,
+            lockedReason: "",
+            lockedAt: "",
+            telegramChatId: "",
+          };
+          db.users.push(worker);
+          created += 1;
+        } else {
+          updated += 1;
+        }
+        Object.assign(worker, {
+          employeeCode,
+          phone,
+          fullName,
+          department: pick(row, ["department", "bophan", "bo phan", "phong ban"]) || worker.department || "",
+        });
+      }
+      audit(db, user, "IMPORT_WORKERS", { created, updated });
+      writeDb(db);
+      return json(res, 200, { created, updated });
+    }
+
+    if (route === "POST /api/admin/delete-worker") {
+      const user = requireRole(req, res, ["admin"]);
+      if (!user) return;
+      const body = await readBody(req);
+      const db = readDb();
+      const employeeCode = String(body.employeeCode || "");
+      const worker = db.users.find((u) => u.employeeCode === employeeCode && u.role === "worker");
+      if (!worker) return json(res, 404, { error: "Khong tim thay cong nhan" });
+      db.users = db.users.filter((u) => u.id !== worker.id);
+      audit(db, user, "DELETE_WORKER", { employeeCode });
+      writeDb(db);
+      return json(res, 200, { ok: true });
+    }
+
     if (route === "POST /api/profile/change-password") {
       const user = requireUser(req, res);
       if (!user) return;
@@ -389,13 +476,16 @@ async function api(req, res) {
       const shift = normalizeShift(body.shift);
       const mealDate = String(body.mealDate || "").slice(0, 10);
       const price = Number(body.price || db.settings.defaultMealPrice);
+      const items = Array.isArray(body.items) ? body.items : parseMenuItems(body.itemsText || body.dishes);
       let menu = getMenu(db, mealDate, shift);
       if (!menu) {
         menu = { id: crypto.randomUUID(), mealDate, shift };
         db.menus.push(menu);
       }
       Object.assign(menu, {
-        dishes: String(body.dishes || ""),
+        dishes: items.map((item) => item.name).join(", "),
+        items,
+        totalMenuValue: menuTotal(items),
         plannedQty: Number(body.plannedQty || 0),
         price,
         note: String(body.note || ""),
@@ -494,7 +584,7 @@ async function api(req, res) {
     }
 
     if (route === "GET /api/reports/daily") {
-      const user = requireRole(req, res, ["admin", "kitchen", "accountant"]);
+      const user = requireRole(req, res, ["admin", "kitchen"]);
       if (!user) return;
       const db = readDb();
       const mealDate = url.searchParams.get("mealDate") || new Date().toISOString().slice(0, 10);
@@ -509,6 +599,8 @@ async function api(req, res) {
           shift,
           shiftLabel: shiftLabel(shift),
           plannedQty: menu ? menu.plannedQty : 0,
+          menuItems: menu ? menu.items || [] : [],
+          totalMenuValue: menu ? Number(menu.totalMenuValue || 0) : 0,
           registeredQty: rows.length - added,
           addedAfterCutoffQty: added,
           totalQty: rows.length,
@@ -518,7 +610,7 @@ async function api(req, res) {
     }
 
     if (route === "GET /api/reports/monthly") {
-      const user = requireRole(req, res, ["admin", "kitchen", "accountant", "worker"]);
+      const user = requireRole(req, res, ["admin", "kitchen", "worker"]);
       if (!user) return;
       const db = readDb();
       const month = url.searchParams.get("month") || new Date().toISOString().slice(0, 7);
@@ -528,7 +620,7 @@ async function api(req, res) {
     }
 
     if (route === "GET /api/reports/locked-users") {
-      const user = requireRole(req, res, ["admin", "accountant"]);
+      const user = requireRole(req, res, ["admin"]);
       if (!user) return;
       const db = readDb();
       const rows = db.users
@@ -539,7 +631,7 @@ async function api(req, res) {
     }
 
     if (route === "POST /api/payments/mark-paid") {
-      const user = requireRole(req, res, ["admin", "accountant"]);
+      const user = requireRole(req, res, ["admin"]);
       if (!user) return;
       const body = await readBody(req);
       const db = readDb();
@@ -572,7 +664,7 @@ async function api(req, res) {
     }
 
     if (route === "POST /api/payments/reconcile-csv") {
-      const user = requireRole(req, res, ["admin", "accountant"]);
+      const user = requireRole(req, res, ["admin"]);
       if (!user) return;
       const body = await readBody(req);
       const month = String(body.month || "");
@@ -625,7 +717,7 @@ async function api(req, res) {
     }
 
     if (route === "POST /api/telegram/remind") {
-      const user = requireRole(req, res, ["admin", "accountant"]);
+      const user = requireRole(req, res, ["admin"]);
       if (!user) return;
       const body = await readBody(req);
       const month = String(body.month || "");

@@ -20,21 +20,6 @@
       "role": "admin",
       "status": "active",
       "phone": "admin",
-      "mustChangePassword": true,
-      "registrationLocked": false,
-      "lockedReason": "",
-      "lockedAt": "",
-      "telegramChatId": ""
-    },
-    {
-      "id": "u-kitchen",
-      "employeeCode": "kitchen",
-      "password": "123456",
-      "fullName": "Nha bep",
-      "department": "Bep an",
-      "role": "kitchen",
-      "status": "active",
-      "phone": "kitchen",
       "mustChangePassword": false,
       "registrationLocked": false,
       "lockedReason": "",
@@ -42,14 +27,14 @@
       "telegramChatId": ""
     },
     {
-      "id": "u-accountant",
-      "employeeCode": "accountant",
+      "id": "u-kitchen",
+      "employeeCode": "Nhabep",
       "password": "123456",
-      "fullName": "Ke toan",
-      "department": "Ke toan",
-      "role": "accountant",
+      "fullName": "Nha bep",
+      "department": "Bep an",
+      "role": "kitchen",
       "status": "active",
-      "phone": "accountant",
+      "phone": "Nhabep",
       "mustChangePassword": false,
       "registrationLocked": false,
       "lockedReason": "",
@@ -108,10 +93,41 @@
       "mealDate": "2026-06-11",
       "shift": "lunch",
       "dishes": "Com, thit kho, rau xao, canh",
+      "items": [
+        {
+          "seq": 1,
+          "name": "Com",
+          "grams": 250,
+          "unitPrice": 20,
+          "amount": 5000
+        },
+        {
+          "seq": 2,
+          "name": "Thit kho",
+          "grams": 100,
+          "unitPrice": 120,
+          "amount": 12000
+        },
+        {
+          "seq": 3,
+          "name": "Rau xao",
+          "grams": 100,
+          "unitPrice": 30,
+          "amount": 3000
+        },
+        {
+          "seq": 4,
+          "name": "Canh",
+          "grams": 150,
+          "unitPrice": 10,
+          "amount": 1500
+        }
+      ],
+      "totalMenuValue": 21500,
       "plannedQty": 500,
       "price": 25000,
       "note": "",
-      "updatedBy": "kitchen",
+      "updatedBy": "Nhabep",
       "updatedAt": "2026-06-10T11:00:00.000Z"
     },
     {
@@ -119,10 +135,41 @@
       "mealDate": "2026-06-11",
       "shift": "dinner",
       "dishes": "Com, ca sot, rau luoc, canh",
+      "items": [
+        {
+          "seq": 1,
+          "name": "Com",
+          "grams": 250,
+          "unitPrice": 20,
+          "amount": 5000
+        },
+        {
+          "seq": 2,
+          "name": "Ca sot",
+          "grams": 120,
+          "unitPrice": 100,
+          "amount": 12000
+        },
+        {
+          "seq": 3,
+          "name": "Rau luoc",
+          "grams": 100,
+          "unitPrice": 25,
+          "amount": 2500
+        },
+        {
+          "seq": 4,
+          "name": "Canh",
+          "grams": 150,
+          "unitPrice": 10,
+          "amount": 1500
+        }
+      ],
+      "totalMenuValue": 21000,
       "plannedQty": 300,
       "price": 25000,
       "note": "",
-      "updatedBy": "kitchen",
+      "updatedBy": "Nhabep",
       "updatedAt": "2026-06-10T11:00:00.000Z"
     }
   ],

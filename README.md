@@ -29,14 +29,14 @@ Mo trinh duyet: `http://localhost:3000`
 | Vai tro | Ma dang nhap | Mat khau |
 |---|---|---|
 | Admin | admin | 123456 |
-| Nha bep | kitchen | 123456 |
-| Ke toan | accountant | 123456 |
+| Nha bep | Nhabep | 123456 |
 | Cong nhan | 0901000001 | 123456 |
 | Cong nhan | 0901000002 | 123456 |
 
 ## Module co san
 
-- Nha bep nhap/sua thuc don, dinh muc, don gia cho ca trua/toi.
+- Admin nhap danh sach cong nhan tu file Excel luu dang CSV, xem/xoa tai khoan cong nhan, quan ly dong tien tung account.
+- Nha bep nhap/sua dinh luong tung mon an theo bua: so thu tu, ten mon, dinh luong gam, don gia, thanh tien, tong gia tri thuc don.
 - Cong nhan dang ky/huy truoc 08h ngay an.
 - Sau 08h chi nha bep duoc bo sung suat theo ma nhan vien.
 - Cong nhan da dang ky nhung khong an van tinh tien.
@@ -72,6 +72,16 @@ node server.js
 ```
 
 Trong danh sach user, moi cong nhan can co `telegramChatId`.
+
+## Mau file Excel/CSV nhap cong nhan
+
+Trong Excel, tao cac cot sau roi Save As CSV:
+
+```csv
+phone,employeeCode,fullName,department
+0901000001,CN001,Nguyen Van A,May 1
+0901000002,CN002,Tran Thi B,May 2
+```
 
 ## Mau CSV sao ke
 

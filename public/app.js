@@ -24,7 +24,6 @@ function roleLabel(role) {
   return {
     admin: "Admin",
     kitchen: "Nha bep",
-    accountant: "Ke toan",
     worker: "Cong nhan",
   }[role] || role;
 }
@@ -58,7 +57,7 @@ async function init() {
   const data = await api("/api/me");
   state.user = data.user;
   if (!state.user) return renderLogin();
-  state.tab = state.user.role === "worker" ? "worker" : "kitchen";
+  state.tab = state.user.role === "worker" ? "worker" : state.user.role === "admin" ? "admin" : "kitchen";
   await loadBootstrap();
   renderShell();
 }
@@ -79,7 +78,7 @@ function renderLogin() {
         <button>Dang nhap</button>
         <div id="loginMessage"></div>
       </form>
-      <p class="muted">Mau: 0901000001 / 0901000002 / 0901000003, mat khau 123456. Noi bo: admin, kitchen, accountant.</p>
+      <p class="muted">Mau: 0901000001 / 0901000002 / 0901000003, mat khau 123456. Quan ly: admin / 123456, Nhabep / 123456.</p>
     </main>
   `;
   document.querySelector("#loginForm").addEventListener("submit", async (event) => {
@@ -137,11 +136,12 @@ function renderShell() {
 
 function renderTabs() {
   const tabs = [];
+  if (state.user.role === "admin") tabs.push(["admin", "Admin"]);
   if (state.user.role === "worker") tabs.push(["worker", "Dang ky cua toi"]);
   if (["admin", "kitchen"].includes(state.user.role)) tabs.push(["kitchen", "Nha bep"]);
-  if (["admin", "kitchen", "accountant"].includes(state.user.role)) tabs.push(["daily", "Bao cao ngay"]);
-  if (["admin", "accountant", "kitchen", "worker"].includes(state.user.role)) tabs.push(["monthly", "Cong no thang"]);
-  if (["admin", "accountant"].includes(state.user.role)) tabs.push(["reconcile", "Doi soat & Telegram"]);
+  if (["admin", "kitchen"].includes(state.user.role)) tabs.push(["daily", "Bao cao ngay"]);
+  if (["admin", "kitchen", "worker"].includes(state.user.role)) tabs.push(["monthly", "Dong tien"]);
+  if (state.user.role === "admin") tabs.push(["reconcile", "Doi soat & Telegram"]);
   tabs.push(["profile", "Ho so"]);
   return `<nav class="tabs">${tabs
     .map(([id, label]) => `<button class="tab ${state.tab === id ? "active" : ""}" data-tab="${id}">${label}</button>`)
@@ -149,6 +149,7 @@ function renderTabs() {
 }
 
 function renderView() {
+  if (state.tab === "admin") return renderAdmin();
   if (state.tab === "worker") return renderWorker();
   if (state.tab === "kitchen") return renderKitchen();
   if (state.tab === "daily") return renderDaily();
@@ -181,6 +182,83 @@ function statusBadge(order) {
   };
   const cls = ["registered", "locked", "added_after_cutoff"].includes(order.status) ? "ok" : "bad";
   return `<span class="status ${cls}">${labels[order.status] || order.status}</span>`;
+}
+
+function renderAdmin() {
+  const workers = state.users.filter((u) => u.role === "worker");
+  const view = document.querySelector("#view");
+  view.innerHTML = html`
+    <div class="grid">
+      <section class="panel span-6">
+        <h2>Nhap danh sach cong nhan tu Excel</h2>
+        <p class="muted">Trong Excel, chon Save As CSV. Dong dau tien nen co cot: phone, employeeCode, fullName, department.</p>
+        <textarea id="workerCsv">phone,employeeCode,fullName,department
+0901000004,CN004,Pham Van D,Van hanh</textarea>
+        <div class="actions">
+          <button id="importWorkersBtn">Nhap danh sach</button>
+        </div>
+        <div id="adminImportMessage"></div>
+      </section>
+      <section class="panel span-6">
+        <h2>Thong tin he thong</h2>
+        <p><strong>Tong cong nhan:</strong> ${workers.length}</p>
+        <p><strong>Tai khoan quan ly:</strong> admin, Nhabep</p>
+        <p class="muted">Admin co the xem toan bo tai khoan, xoa cong nhan va quan ly dong tien trong tab Dong tien.</p>
+      </section>
+      <section class="panel span-12">
+        <h2>Danh sach tai khoan cong nhan</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Ma NV</th><th>So dien thoai</th><th>Ho ten</th><th>Bo phan</th><th>Telegram</th><th>Trang thai</th><th>Khoa dang ky</th><th></th></tr></thead>
+            <tbody>
+              ${workers
+                .map(
+                  (u) => `<tr>
+                    <td>${u.employeeCode}</td><td>${u.phone || ""}</td><td>${u.fullName}</td><td>${u.department}</td><td>${u.telegramChatId || ""}</td>
+                    <td>${u.status}</td><td>${u.registrationLocked ? "Dang khoa" : "Mo"}</td>
+                    <td><button class="danger" data-delete-worker="${u.employeeCode}">Xoa</button></td>
+                  </tr>`
+                )
+                .join("")}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  `;
+  document.querySelector("#importWorkersBtn").addEventListener("click", importWorkers);
+  document.querySelectorAll("[data-delete-worker]").forEach((btn) => {
+    btn.addEventListener("click", () => deleteWorker(btn.dataset.deleteWorker));
+  });
+}
+
+async function importWorkers() {
+  try {
+    const csv = document.querySelector("#workerCsv").value;
+    const data = await api("/api/admin/import-workers", {
+      method: "POST",
+      body: JSON.stringify({ csv }),
+    });
+    await loadBootstrap();
+    renderAdmin();
+    setMessage("#adminImportMessage", `Da nhap: them ${data.created}, cap nhat ${data.updated}.`, "success");
+  } catch (err) {
+    setMessage("#adminImportMessage", err.message, "error");
+  }
+}
+
+async function deleteWorker(employeeCode) {
+  if (!confirm(`Xoa cong nhan ${employeeCode}?`)) return;
+  try {
+    await api("/api/admin/delete-worker", {
+      method: "POST",
+      body: JSON.stringify({ employeeCode }),
+    });
+    await loadBootstrap();
+    renderAdmin();
+  } catch (err) {
+    alert(err.message);
+  }
 }
 
 async function renderWorker() {
@@ -276,7 +354,7 @@ function renderKitchen() {
   view.innerHTML = html`
     <div class="grid">
       <section class="panel span-6">
-        <h2>Nhap/sua thuc don</h2>
+        <h2>Nhap dinh luong mon an</h2>
         <form id="menuForm" class="form-grid">
           <label>Ngay an <input name="mealDate" type="date" value="${today}" /></label>
           <label>Ca an
@@ -285,11 +363,16 @@ function renderKitchen() {
               <option value="dinner">Toi</option>
             </select>
           </label>
-          <label>Mon an <textarea name="dishes" placeholder="Com, mon man, rau, canh"></textarea></label>
+          <label>Danh sach mon an
+            <textarea name="itemsText" placeholder="Moi dong: STT, Ten mon, Dinh luong gam, Don gia/gam, Thanh tien
+1, Com, 250, 20, 5000
+2, Thit kho, 100, 120, 12000
+3, Rau xao, 100, 30, 3000"></textarea>
+          </label>
           <label>Dinh muc du kien <input name="plannedQty" type="number" value="300" /></label>
-          <label>Don gia <input name="price" type="number" value="${state.settings.defaultMealPrice}" /></label>
+          <label>Don gia suat an thu cua cong nhan <input name="price" type="number" value="${state.settings.defaultMealPrice}" /></label>
           <label>Ghi chu <input name="note" /></label>
-          <button>Luu thuc don</button>
+          <button>Luu dinh luong bua an</button>
           <div id="menuMessage"></div>
         </form>
       </section>
@@ -363,9 +446,21 @@ async function loadDailyReport() {
     <div class="summary">
       ${data.summary
         .map(
-          (s) => `<div class="metric"><span>${s.shiftLabel}</span><strong>${s.totalQty}</strong><small>Dinh muc ${s.plannedQty}, bo sung ${s.addedAfterCutoffQty}</small></div>`
+          (s) => `<div class="metric"><span>${s.shiftLabel}</span><strong>${s.totalQty}</strong><small>Dinh muc ${s.plannedQty}, bo sung ${s.addedAfterCutoffQty}, gia tri thuc don ${money(s.totalMenuValue)}</small></div>`
         )
         .join("")}
+    </div>
+    <h3>Dinh luong thuc don</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Ca</th><th>STT</th><th>Ten mon</th><th>Dinh luong gam</th><th>Don gia</th><th>Thanh tien</th></tr></thead>
+        <tbody>
+          ${data.summary
+            .flatMap((s) => (s.menuItems || []).map((item) => ({ shiftLabel: s.shiftLabel, ...item })))
+            .map((item) => `<tr><td>${item.shiftLabel}</td><td>${item.seq}</td><td>${item.name}</td><td>${item.grams}</td><td>${money(item.unitPrice)}</td><td>${money(item.amount)}</td></tr>`)
+            .join("")}
+        </tbody>
+      </table>
     </div>
     <h3>Danh sach chi tiet</h3>
     <div class="table-wrap">
@@ -416,7 +511,7 @@ async function loadMonthlyReport() {
                 <td>${d.employeeCode}</td><td>${user.phone || state.user.phone || ""}</td><td>${d.fullName}</td><td>${d.department}</td><td>${d.lunchQty}</td><td>${d.dinnerQty}</td><td>${money(d.totalAmount)}</td>
                 <td>${d.paymentCode}</td><td><img class="qr" src="${d.qrUrl}" alt="QR ${d.employeeCode}" /></td>
                 <td><span class="status ${d.status === "paid" ? "ok" : "warn"}">${d.status === "paid" ? "Da thanh toan" : "Chua thanh toan"}</span></td>
-                <td>${["admin", "accountant"].includes(state.user.role) ? `<button data-paid="${d.employeeCode}" data-month="${data.month}">Da thu</button>` : ""}</td>
+                <td>${state.user.role === "admin" ? `<button data-paid="${d.employeeCode}" data-month="${data.month}">Da thu</button>` : ""}</td>
               </tr>`;
             })
             .join("")}
