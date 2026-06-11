@@ -4,7 +4,9 @@
   "private": true,
   "description": "Web app quan ly dang ky com ca cong nhan",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "cf:deploy": "npx wrangler pages deploy public --project-name hanhchinhtpcnghison",
+    "cf:d1:migrate": "npx wrangler d1 migrations apply hanhchinhtpcnghison --remote"
   },
   "dependencies": {
     "pg": "^8.13.1",

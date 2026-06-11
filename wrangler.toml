@@ -1,0 +1,6 @@
+name = "hanhchinhtpcnghison"
+compatibility_date = "2026-06-11"
+pages_build_output_dir = "public"
+
+# Khi tao Cloudflare Pages tren dashboard, gan D1 binding ten DB.
+# Migration schema nam tai migrations/0001_cloudflare_d1.sql.

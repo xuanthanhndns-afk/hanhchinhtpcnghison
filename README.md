@@ -128,6 +128,60 @@ DATA_FILE=/var/data/db.json
 
 Luu y: Render Persistent Disk chi gan duoc cho web service tra phi. Neu tiep tuc dung plan `free`, hay dung `DATABASE_URL` voi Neon PostgreSQL.
 
+## Trien khai Cloudflare Pages + D1
+
+Repo nay da co ban backend rieng cho Cloudflare:
+
+- `functions/api/[[path]].js`: API chay tren Cloudflare Pages Functions.
+- `migrations/0001_cloudflare_d1.sql`: schema D1 can tao.
+- `public/templates`: file mau Excel/CSV de Cloudflare Pages phuc vu truc tiep.
+
+Nen giu Render/Neon la ban du phong cho den khi Cloudflare chay on dinh.
+
+### Tao Cloudflare D1
+
+1. Vao Cloudflare Dashboard.
+2. Vao `Workers & Pages` > `D1 SQL Database`.
+3. Tao database ten `hanhchinhtpcnghison`.
+4. Mo database vua tao, vao tab `Console`.
+5. Chay noi dung trong file `migrations/0001_cloudflare_d1.sql`.
+
+### Tao Cloudflare Pages
+
+1. Vao `Workers & Pages` > `Create application` > `Pages`.
+2. Chon repo GitHub `hanhchinhtpcnghison`.
+3. Build settings:
+
+```text
+Framework preset: None
+Build command: bo trong
+Build output directory: public
+Root directory: bo trong
+```
+
+4. Sau khi tao Pages, vao `Settings` > `Functions` > `D1 database bindings`.
+5. Them binding:
+
+```text
+Variable name: DB
+D1 database: hanhchinhtpcnghison
+```
+
+6. Neu dung Telegram, vao `Settings` > `Environment variables` va them:
+
+```text
+TELEGRAM_BOT_TOKEN=token_bot_cua_anh
+```
+
+7. Deploy lai Pages.
+
+Tai khoan mac dinh Cloudflare D1 khi khoi tao:
+
+```text
+admin / 123456
+Nhabep / 123456
+```
+
 ## Mau CSV sao ke
 
 File CSV can co cot:
