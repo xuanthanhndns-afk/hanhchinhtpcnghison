@@ -383,6 +383,28 @@ function menuTotal(items) {
   return items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
 }
 
+function defaultTelegramTemplates() {
+  return {
+    debtNotice:
+      "Kinh gui {hoTen}, tien com thang {thang} cua Anh/Chi la {soTien} dong. Vui long chuyen khoan voi noi dung: {maThanhToan}.",
+    debtReminder:
+      "Nhac no: Anh/Chi {hoTen} con tien com thang {thang} la {soTien} dong. Vui long thanh toan voi noi dung: {maThanhToan}. {ghiChuKhoa}",
+  };
+}
+
+function renderTelegramTemplate(template, debt, month, worker, overdue) {
+  const values = {
+    hoTen: debt.fullName || "",
+    thang: month,
+    soTien: Number(debt.totalAmount || 0).toLocaleString("vi-VN"),
+    maThanhToan: debt.paymentCode || "",
+    soDienThoai: worker ? worker.phone || "" : "",
+    boPhan: debt.department || "",
+    ghiChuKhoa: overdue ? "Tai khoan se bi khoa dang ky com den khi thanh toan thanh cong." : "",
+  };
+  return String(template || "").replace(/\{(\w+)\}/g, (_, key) => values[key] ?? "");
+}
+
 async function sendTelegram(chatId, text) {
   if (!TELEGRAM_BOT_TOKEN) {
     return { ok: false, skipped: true, reason: "Chua cau hinh TELEGRAM_BOT_TOKEN" };
@@ -618,6 +640,21 @@ async function api(req, res) {
       audit(db, saved, "UPDATE_TELEGRAM", { employeeCode: saved.employeeCode });
       await writeDb(db);
       return json(res, 200, { user: sanitizeUser(saved) });
+    }
+
+    if (route === "POST /api/settings/telegram-templates") {
+      const user = requireRole(req, res, ["admin"]);
+      if (!user) return;
+      const body = await readBody(req);
+      const db = readDb();
+      const defaults = defaultTelegramTemplates();
+      db.settings.telegramTemplates = {
+        debtNotice: String(body.debtNotice || defaults.debtNotice).trim(),
+        debtReminder: String(body.debtReminder || defaults.debtReminder).trim(),
+      };
+      audit(db, user, "UPDATE_TELEGRAM_TEMPLATES", {});
+      await writeDb(db);
+      return json(res, 200, { telegramTemplates: db.settings.telegramTemplates });
     }
 
     if (route === "POST /api/menus") {
@@ -896,6 +933,14 @@ async function api(req, res) {
       const body = await readBody(req);
       const month = String(body.month || "");
       const db = readDb();
+      const defaults = defaultTelegramTemplates();
+      if (body.debtNotice || body.debtReminder) {
+        db.settings.telegramTemplates = {
+          debtNotice: String(body.debtNotice || defaults.debtNotice).trim(),
+          debtReminder: String(body.debtReminder || defaults.debtReminder).trim(),
+        };
+      }
+      const templates = { ...defaults, ...(db.settings.telegramTemplates || {}) };
       const debts = buildMonthlyDebts(db, month).filter((d) => d.status !== "paid");
       const results = [];
       for (const debt of debts) {
@@ -906,11 +951,8 @@ async function api(req, res) {
           worker.lockedReason = `Qua han thanh toan tien com ${month}`;
           worker.lockedAt = nowIso();
         }
-        const text = `Anh/chi ${debt.fullName} co tien com thang ${month} la ${debt.totalAmount.toLocaleString(
-          "vi-VN"
-        )} dong. Vui long chuyen khoan voi noi dung: ${debt.paymentCode}${
-          overdue ? ". Tai khoan se bi khoa dang ky com den khi thanh toan thanh cong." : ""
-        }`;
+        const template = overdue ? templates.debtReminder : templates.debtNotice;
+        const text = renderTelegramTemplate(template, debt, month, worker, overdue);
         const result = await sendTelegram(worker ? worker.telegramChatId : "", text);
         results.push({ employeeCode: debt.employeeCode, result });
       }

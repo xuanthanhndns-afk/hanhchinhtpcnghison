@@ -61,6 +61,16 @@ function setMessage(target, text, kind = "") {
   if (el) el.innerHTML = text ? `<p class="${kind}">${text}</p>` : "";
 }
 
+function telegramTemplates() {
+  const defaults = {
+    debtNotice:
+      "Kinh gui {hoTen}, tien com thang {thang} cua Anh/Chi la {soTien} dong. Vui long chuyen khoan voi noi dung: {maThanhToan}.",
+    debtReminder:
+      "Nhac no: Anh/Chi {hoTen} con tien com thang {thang} la {soTien} dong. Vui long thanh toan voi noi dung: {maThanhToan}. {ghiChuKhoa}",
+  };
+  return { ...defaults, ...((state.settings && state.settings.telegramTemplates) || {}) };
+}
+
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -712,7 +722,7 @@ function renderKitchen() {
               <select name="employeeCode">
                 ${state.users
                   .filter((u) => u.role === "worker")
-                  .map((u) => `<option value="${u.employeeCode}">${u.employeeCode} - ${u.phone || ""} - ${u.fullName}</option>`)
+                  .map((u) => `<option value="${u.employeeCode}">${u.phone || u.employeeCode} - ${u.fullName}</option>`)
                   .join("")}
               </select>
             </label>
@@ -885,6 +895,7 @@ async function loadMonthlyReport() {
 
 function renderReconcile() {
   const view = document.querySelector("#view");
+  const templates = telegramTemplates();
   view.innerHTML = html`
     <div class="grid">
       <section class="panel span-6">
@@ -904,6 +915,14 @@ function renderReconcile() {
         <p class="muted">Sau ${state.settings.paymentGraceDays || 5} ngày của tháng kế tiếp, nếu chưa thanh toán thì hệ thống nhắc và khóa quyền đăng ký của công nhân.</p>
         <div class="form-grid">
           <label>Tháng <input id="telegramMonth" type="month" value="${currentMonth}" /></label>
+          <label>Mẫu tin nhắn thông báo công nợ
+            <textarea id="debtNoticeTemplate" rows="4">${templates.debtNotice}</textarea>
+          </label>
+          <label>Mẫu tin nhắn nhắc nợ / khóa quá hạn
+            <textarea id="debtReminderTemplate" rows="4">${templates.debtReminder}</textarea>
+          </label>
+          <p class="muted">Có thể dùng biến: {hoTen}, {thang}, {soTien}, {maThanhToan}, {soDienThoai}, {boPhan}, {ghiChuKhoa}.</p>
+          <button id="saveTelegramTemplatesBtn" class="secondary">Lưu mẫu tin nhắn</button>
           <button id="telegramBtn">Gửi nhắc / khóa nếu quá hạn</button>
         </div>
         <div id="telegramResult"></div>
@@ -916,6 +935,7 @@ function renderReconcile() {
     </div>
   `;
   document.querySelector("#reconcileBtn").addEventListener("click", reconcileCsv);
+  document.querySelector("#saveTelegramTemplatesBtn").addEventListener("click", saveTelegramTemplates);
   document.querySelector("#telegramBtn").addEventListener("click", sendTelegramReminders);
   document.querySelector("#loadLocked").addEventListener("click", loadLockedUsers);
   loadLockedUsers();
@@ -942,11 +962,31 @@ async function sendTelegramReminders() {
   try {
     const data = await api("/api/telegram/remind", {
       method: "POST",
-      body: JSON.stringify({ month: document.querySelector("#telegramMonth").value }),
+      body: JSON.stringify({
+        month: document.querySelector("#telegramMonth").value,
+        debtNotice: document.querySelector("#debtNoticeTemplate").value,
+        debtReminder: document.querySelector("#debtReminderTemplate").value,
+      }),
     });
     document.querySelector("#telegramResult").innerHTML = `<p class="success">Đã xử lý ${data.results.length} tin nhắn/nhắc nợ.</p>`;
     await loadBootstrap();
     loadLockedUsers();
+  } catch (err) {
+    setMessage("#telegramResult", err.message, "error");
+  }
+}
+
+async function saveTelegramTemplates() {
+  try {
+    const data = await api("/api/settings/telegram-templates", {
+      method: "POST",
+      body: JSON.stringify({
+        debtNotice: document.querySelector("#debtNoticeTemplate").value,
+        debtReminder: document.querySelector("#debtReminderTemplate").value,
+      }),
+    });
+    state.settings.telegramTemplates = data.telegramTemplates;
+    setMessage("#telegramResult", "Đã lưu mẫu tin nhắn Telegram.", "success");
   } catch (err) {
     setMessage("#telegramResult", err.message, "error");
   }

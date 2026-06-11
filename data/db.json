@@ -3,6 +3,10 @@
     "cutoffTime": "08:00",
     "defaultMealPrice": 25000,
     "paymentGraceDays": 5,
+    "telegramTemplates": {
+      "debtNotice": "Kinh gui {hoTen}, tien com thang {thang} cua Anh/Chi la {soTien} dong. Vui long chuyen khoan voi noi dung: {maThanhToan}.",
+      "debtReminder": "Nhac no: Anh/Chi {hoTen} con tien com thang {thang} la {soTien} dong. Vui long thanh toan voi noi dung: {maThanhToan}. {ghiChuKhoa}"
+    },
     "payment": {
       "bankBin": "970436",
       "accountNo": "0123456789",
