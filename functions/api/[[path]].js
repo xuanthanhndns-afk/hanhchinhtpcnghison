@@ -618,6 +618,24 @@ async function handleApi(request, env) {
     return json({ telegramTemplates: db.settings.telegramTemplates });
   }
 
+  if (route === "POST /api/telegram/manual") {
+    const user = await requireRole(request, env, ["admin"]);
+    const body = await readBody(request);
+    const employeeCode = String(body.employeeCode || "").trim();
+    const text = String(body.text || "").trim();
+    if (!employeeCode) throw new ApiError(400, "Vui long chon nguoi nhan");
+    if (!text) throw new ApiError(400, "Vui long nhap noi dung tin nhan");
+    const db = await readDb(env);
+    const worker = db.users.find((u) => u.role === "worker" && u.employeeCode === employeeCode);
+    if (!worker) throw new ApiError(404, "Khong tim thay thanh vien");
+    if (!worker.telegramChatId) throw new ApiError(400, "Thanh vien nay chua lien ket Telegram Chat ID");
+    const result = await sendTelegram(env, worker.telegramChatId, text);
+    if (!result.ok) throw new ApiError(400, result.reason || result.description || "Khong gui duoc tin nhan Telegram");
+    audit(db, user, "TELEGRAM_MANUAL", { employeeCode, ok: result.ok === true });
+    await writeDb(env, db);
+    return json({ result, recipient: sanitizeUser(worker) });
+  }
+
   if (route === "POST /api/menus") {
     const user = await requireRole(request, env, ["admin", "kitchen"]);
     const body = await readBody(request);

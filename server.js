@@ -657,6 +657,25 @@ async function api(req, res) {
       return json(res, 200, { telegramTemplates: db.settings.telegramTemplates });
     }
 
+    if (route === "POST /api/telegram/manual") {
+      const user = requireRole(req, res, ["admin"]);
+      if (!user) return;
+      const body = await readBody(req);
+      const employeeCode = String(body.employeeCode || "").trim();
+      const text = String(body.text || "").trim();
+      if (!employeeCode) return json(res, 400, { error: "Vui long chon nguoi nhan" });
+      if (!text) return json(res, 400, { error: "Vui long nhap noi dung tin nhan" });
+      const db = readDb();
+      const worker = db.users.find((u) => u.role === "worker" && u.employeeCode === employeeCode);
+      if (!worker) return json(res, 404, { error: "Khong tim thay thanh vien" });
+      if (!worker.telegramChatId) return json(res, 400, { error: "Thanh vien nay chua lien ket Telegram Chat ID" });
+      const result = await sendTelegram(worker.telegramChatId, text);
+      if (!result.ok) return json(res, 400, { error: result.reason || result.description || "Khong gui duoc tin nhan Telegram" });
+      audit(db, user, "TELEGRAM_MANUAL", { employeeCode, ok: result.ok === true });
+      await writeDb(db);
+      return json(res, 200, { result, recipient: sanitizeUser(worker) });
+    }
+
     if (route === "POST /api/menus") {
       const user = requireRole(req, res, ["admin", "kitchen"]);
       if (!user) return;

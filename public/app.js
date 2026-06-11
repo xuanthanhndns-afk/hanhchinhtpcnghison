@@ -1109,6 +1109,28 @@ function renderReconcile() {
         <div id="telegramResult"></div>
       </section>
       <section class="panel span-12">
+        <h2>Gửi Telegram thủ công cho cá nhân</h2>
+        <p class="muted">Admin chọn thành viên đã liên kết Telegram, soạn nội dung riêng và gửi trực tiếp.</p>
+        <div class="form-grid">
+          <label>Người nhận
+            <select id="manualTelegramEmployee">
+              ${state.users
+                .filter((u) => u.role === "worker")
+                .map(
+                  (u) =>
+                    `<option value="${u.employeeCode}">${u.fullName} - ${u.phone || u.employeeCode}${u.telegramChatId ? "" : " - chưa liên kết Telegram"}</option>`
+                )
+                .join("")}
+            </select>
+          </label>
+          <label>Nội dung tin nhắn
+            <textarea id="manualTelegramText" rows="5" placeholder="Nhập nội dung cần gửi cho cá nhân"></textarea>
+          </label>
+          <button id="manualTelegramBtn">Gửi Telegram thủ công</button>
+        </div>
+        <div id="manualTelegramResult"></div>
+      </section>
+      <section class="panel span-12">
         <h2>Danh sách đang bị khóa</h2>
         <button id="loadLocked" class="secondary">Tải danh sách</button>
         <div id="lockedContent"></div>
@@ -1118,6 +1140,7 @@ function renderReconcile() {
   document.querySelector("#reconcileBtn").addEventListener("click", reconcileCsv);
   document.querySelector("#saveTelegramTemplatesBtn").addEventListener("click", saveTelegramTemplates);
   document.querySelector("#telegramBtn").addEventListener("click", sendTelegramReminders);
+  document.querySelector("#manualTelegramBtn").addEventListener("click", sendManualTelegram);
   document.querySelector("#loadLocked").addEventListener("click", loadLockedUsers);
   loadLockedUsers();
 }
@@ -1170,6 +1193,22 @@ async function saveTelegramTemplates() {
     setMessage("#telegramResult", "Đã lưu mẫu tin nhắn Telegram.", "success");
   } catch (err) {
     setMessage("#telegramResult", err.message, "error");
+  }
+}
+
+async function sendManualTelegram() {
+  try {
+    const data = await api("/api/telegram/manual", {
+      method: "POST",
+      body: JSON.stringify({
+        employeeCode: document.querySelector("#manualTelegramEmployee").value,
+        text: document.querySelector("#manualTelegramText").value,
+      }),
+    });
+    document.querySelector("#manualTelegramText").value = "";
+    setMessage("#manualTelegramResult", `Đã gửi tin nhắn cho ${data.recipient.fullName}.`, "success");
+  } catch (err) {
+    setMessage("#manualTelegramResult", err.message, "error");
   }
 }
 
