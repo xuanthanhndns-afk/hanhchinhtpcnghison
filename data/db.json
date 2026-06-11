@@ -214,6 +214,7 @@
   ],
   "payments": [],
   "bankStatements": [],
+  "passwordResetCodes": [],
   "auditLogs": [
     {
       "id": "e5da524e-8927-4f47-bea6-ef3e6b0c90d5",

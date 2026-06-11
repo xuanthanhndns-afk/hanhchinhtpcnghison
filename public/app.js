@@ -159,7 +159,25 @@ function renderLogin() {
         <button>Đăng nhập</button>
         <div id="loginMessage"></div>
       </form>
-      <p class="muted login-help">Quên mật khẩu? Vui lòng liên hệ Admin để đặt lại mật khẩu.</p>
+      <p class="muted login-help"><button type="button" id="forgotPasswordBtn" class="link-button">Quên mật khẩu?</button></p>
+      <section id="forgotPasswordPanel" class="forgot-panel hidden">
+        <h2>Đặt lại mật khẩu</h2>
+        <form id="forgotRequestForm" class="form-grid">
+          <label>Số điện thoại đã đăng ký
+            <input name="phone" autocomplete="tel" />
+          </label>
+          <button>Gửi mã xác thực qua Telegram</button>
+        </form>
+        <form id="forgotConfirmForm" class="form-grid hidden">
+          <label>Mã xác thực 6 số
+            <input name="code" inputmode="numeric" maxlength="6" />
+          </label>
+          ${passwordField("Mật khẩu mới", "newPassword", "new-password")}
+          ${passwordField("Nhắc lại mật khẩu mới", "confirmPassword", "new-password")}
+          <button>Đặt lại mật khẩu</button>
+        </form>
+        <div id="forgotMessage"></div>
+      </section>
       <p class="muted copyright">Copyright @2026 EVNGENCO1TPCNGHISON</p>
     </main>
   `;
@@ -176,6 +194,53 @@ function renderLogin() {
       setMessage("#loginMessage", err.message, "error");
     }
   });
+  document.querySelector("#forgotPasswordBtn").addEventListener("click", () => {
+    document.querySelector("#forgotPasswordPanel").classList.toggle("hidden");
+    setMessage("#forgotMessage", "", "");
+  });
+  document.querySelector("#forgotRequestForm").addEventListener("submit", requestPasswordReset);
+  document.querySelector("#forgotConfirmForm").addEventListener("submit", confirmPasswordReset);
+  attachPasswordToggles();
+}
+
+async function requestPasswordReset(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const phone = String(form.get("phone") || "").trim();
+  try {
+    await api("/api/password-reset/request", {
+      method: "POST",
+      body: JSON.stringify({ phone }),
+    });
+    document.querySelector("#forgotConfirmForm").classList.remove("hidden");
+    document.querySelector("#forgotConfirmForm").dataset.phone = phone;
+    setMessage("#forgotMessage", "Đã gửi mã xác thực 6 số qua Telegram. Vui lòng nhập mã để đặt lại mật khẩu.", "success");
+  } catch (err) {
+    setMessage("#forgotMessage", err.message, "error");
+  }
+}
+
+async function confirmPasswordReset(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  try {
+    await api("/api/password-reset/confirm", {
+      method: "POST",
+      body: JSON.stringify({
+        phone: event.currentTarget.dataset.phone,
+        code: form.get("code"),
+        newPassword: form.get("newPassword"),
+        confirmPassword: form.get("confirmPassword"),
+      }),
+    });
+    document.querySelector("#loginForm [name='loginId']").value = event.currentTarget.dataset.phone;
+    document.querySelector("#forgotConfirmForm").classList.add("hidden");
+    document.querySelector("#forgotRequestForm").reset();
+    document.querySelector("#forgotConfirmForm").reset();
+    setMessage("#forgotMessage", "Đã đặt lại mật khẩu. Anh/chị có thể đăng nhập bằng mật khẩu mới.", "success");
+  } catch (err) {
+    setMessage("#forgotMessage", err.message, "error");
+  }
 }
 
 function renderShell() {

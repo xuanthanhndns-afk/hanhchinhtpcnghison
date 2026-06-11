@@ -218,6 +218,7 @@ function readBody(req) {
 }
 
 function audit(db, actor, action, detail) {
+  db.auditLogs = db.auditLogs || [];
   db.auditLogs.push({
     id: crypto.randomUUID(),
     at: nowIso(),
@@ -421,6 +422,15 @@ async function sendTelegram(chatId, text) {
   return response.json();
 }
 
+function generateResetCode() {
+  return String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
+}
+
+function cleanupResetCodes(db) {
+  const now = Date.now();
+  db.passwordResetCodes = (db.passwordResetCodes || []).filter((item) => Number(item.expiresAt || 0) > now);
+}
+
 function serveStatic(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const isTemplate = url.pathname.startsWith("/templates/");
@@ -469,6 +479,59 @@ async function api(req, res) {
       sessions.set(sid, { userId: user.id, createdAt: Date.now() });
       res.setHeader("set-cookie", `sid=${encodeURIComponent(sid)}; HttpOnly; SameSite=Lax; Path=/`);
       return json(res, 200, { user: sanitizeUser(user) });
+    }
+
+    if (route === "POST /api/password-reset/request") {
+      const body = await readBody(req);
+      const phone = String(body.phone || "").trim();
+      const db = readDb();
+      cleanupResetCodes(db);
+      const worker = db.users.find((u) => u.role === "worker" && String(u.phone || "").trim() === phone && u.status === "active");
+      if (!worker) {
+        return json(res, 404, { error: "So dien thoai chua duoc dang ky. Xin vui long lien he admin de duoc cap tai khoan." });
+      }
+      if (!worker.telegramChatId) {
+        return json(res, 400, { error: "Tai khoan chua lien ket Telegram. Xin vui long lien he admin de duoc ho tro dat lai mat khau." });
+      }
+      const code = generateResetCode();
+      db.passwordResetCodes = (db.passwordResetCodes || []).filter((item) => item.userId !== worker.id);
+      db.passwordResetCodes.push({
+        id: crypto.randomUUID(),
+        userId: worker.id,
+        phone: worker.phone,
+        code,
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 10 * 60 * 1000,
+      });
+      const result = await sendTelegram(worker.telegramChatId, `Ma dat lai mat khau he thong com ca cua Anh/Chi la: ${code}. Ma co hieu luc trong 10 phut.`);
+      if (!result.ok) return json(res, 400, { error: result.reason || result.description || "Khong gui duoc ma qua Telegram" });
+      audit(db, worker, "REQUEST_PASSWORD_RESET", { phone: worker.phone });
+      await writeDb(db);
+      return json(res, 200, { ok: true });
+    }
+
+    if (route === "POST /api/password-reset/confirm") {
+      const body = await readBody(req);
+      const phone = String(body.phone || "").trim();
+      const code = String(body.code || "").trim();
+      const newPassword = String(body.newPassword || "");
+      const confirmPassword = String(body.confirmPassword || "");
+      if (newPassword.length < 6) return json(res, 400, { error: "Mat khau moi can toi thieu 6 ky tu" });
+      if (newPassword !== confirmPassword) return json(res, 400, { error: "Mat khau moi va nhac lai mat khau khong khop" });
+      const db = readDb();
+      cleanupResetCodes(db);
+      const worker = db.users.find((u) => u.role === "worker" && String(u.phone || "").trim() === phone && u.status === "active");
+      if (!worker) {
+        return json(res, 404, { error: "So dien thoai chua duoc dang ky. Xin vui long lien he admin de duoc cap tai khoan." });
+      }
+      const reset = (db.passwordResetCodes || []).find((item) => item.userId === worker.id && item.code === code);
+      if (!reset) return json(res, 400, { error: "Ma xac thuc khong dung hoac da het han" });
+      worker.password = newPassword;
+      worker.mustChangePassword = false;
+      db.passwordResetCodes = (db.passwordResetCodes || []).filter((item) => item.id !== reset.id);
+      audit(db, worker, "CONFIRM_PASSWORD_RESET", { phone: worker.phone });
+      await writeDb(db);
+      return json(res, 200, { ok: true });
     }
 
     if (route === "POST /api/logout") {
