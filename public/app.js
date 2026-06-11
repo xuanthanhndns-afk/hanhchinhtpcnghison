@@ -631,12 +631,14 @@ async function renderWorker() {
             <input id="workerDate" type="date" value="${today}" />
           </label>
           <button id="reloadWorker" class="secondary">Xem ngày</button>
+          <button id="exportWorkerDay" class="secondary">Xuất Excel theo ngày</button>
         </div>
         <div id="workerMeals"></div>
       </section>
     </div>
   `;
   document.querySelector("#reloadWorker").addEventListener("click", renderWorkerMeals);
+  document.querySelector("#exportWorkerDay").addEventListener("click", exportWorkerDay);
   document.querySelector("#workerDate").addEventListener("change", renderWorkerMeals);
   renderWorkerMeals();
 }
@@ -706,6 +708,47 @@ async function cancelOrder(date, shift, employeeCode = "") {
   } catch (err) {
     setMessage(state.tab === "worker" ? "#workerMessage" : "#kitchenMessage", err.message, "error");
   }
+}
+
+async function exportWorkerDay() {
+  const date = document.querySelector("#workerDate").value;
+  const data = await api(`/api/orders?mealDate=${encodeURIComponent(date)}`);
+  const statusLabels = {
+    registered: "Đã đăng ký",
+    locked: "Đã chốt",
+    added_after_cutoff: "Bếp bổ sung",
+    cancelled_before_cutoff: "Đã hủy trước 08h",
+    cancelled_by_admin: "Hủy đặc biệt",
+  };
+  const rows = ["lunch", "dinner"].map((shift) => {
+    const menu = menuFor(date, shift);
+    const order = (data.orders || []).find((item) => item.mealDate === date && item.shift === shift);
+    const itemText =
+      menu && Array.isArray(menu.items)
+        ? menu.items.map((item) => `${item.seq}. ${item.name} - ${item.grams}g - ${money(item.amount)}`).join("; ")
+        : "Nhà bếp chưa nhập thực đơn";
+    return [
+      date,
+      shiftLabel(shift),
+      itemText,
+      menu ? chefNames(menu) : "",
+      menu ? menu.price : state.settings.defaultMealPrice,
+      order ? statusLabels[order.status] || order.status : "Chưa đăng ký",
+      order ? order.source : "",
+    ];
+  });
+  downloadExcel(`dang-ky-com-${state.user.phone || state.user.employeeCode}-${date}.xls`, `Đăng ký cơm ngày ${date}`, [
+    {
+      title: "Thông tin người dùng",
+      headers: ["Họ tên", "Số điện thoại", "Bộ phận"],
+      rows: [[state.user.fullName, state.user.phone || "", state.user.department || ""]],
+    },
+    {
+      title: "Đăng ký cơm theo ngày",
+      headers: ["Ngày ăn", "Ca", "Thực đơn", "Đầu bếp", "Đơn giá", "Trạng thái", "Nguồn"],
+      rows,
+    },
+  ]);
 }
 
 function renderKitchen() {
