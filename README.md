@@ -154,7 +154,7 @@ Nen giu Render/Neon la ban du phong cho den khi Cloudflare chay on dinh.
 
 ```text
 Framework preset: None
-Build command: bo trong
+Build command: exit 0
 Build output directory: public
 Root directory: bo trong
 ```
