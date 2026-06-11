@@ -1145,12 +1145,13 @@ function renderReconcile() {
   view.innerHTML = html`
     <div class="grid">
       <section class="panel span-6">
-        <h2>Đối soát sao kê CSV</h2>
+        <h2>Đối soát sao kê Excel</h2>
         <div class="form-grid">
           <label>Tháng <input id="reconcileMonth" type="month" value="${currentMonth}" /></label>
-          <label>Nội dung CSV
-            <textarea id="csvInput">date,amount,description
-2026-07-01,625000,0901000001 COM T06-2026</textarea>
+          <p class="muted">Chọn file .xlsx sao kê ngân hàng. Sheet đầu tiên cần có các cột: date/Ngày, amount/Số tiền, description/Nội dung.</p>
+          <p><a href="/templates/Mau_doi_soat_sao_ke.xlsx" download>Tải file mẫu Excel đối soát</a></p>
+          <label>File sao kê Excel
+            <input id="reconcileXlsx" type="file" accept=".xlsx,.xls" />
           </label>
           <button id="reconcileBtn">Đối soát</button>
         </div>
@@ -1202,7 +1203,7 @@ function renderReconcile() {
       </section>
     </div>
   `;
-  document.querySelector("#reconcileBtn").addEventListener("click", reconcileCsv);
+  document.querySelector("#reconcileBtn").addEventListener("click", reconcileXlsx);
   document.querySelector("#saveTelegramTemplatesBtn").addEventListener("click", saveTelegramTemplates);
   document.querySelector("#telegramBtn").addEventListener("click", sendTelegramReminders);
   document.querySelector("#manualTelegramBtn").addEventListener("click", sendManualTelegram);
@@ -1210,13 +1211,17 @@ function renderReconcile() {
   loadLockedUsers();
 }
 
-async function reconcileCsv() {
+async function reconcileXlsx() {
   try {
-    const data = await api("/api/payments/reconcile-csv", {
+    const file = document.querySelector("#reconcileXlsx").files[0];
+    if (!file) throw new Error("Vui lòng chọn file sao kê Excel .xlsx.");
+    const fileBase64 = await fileToBase64(file);
+    const data = await api("/api/payments/reconcile-xlsx", {
       method: "POST",
       body: JSON.stringify({
         month: document.querySelector("#reconcileMonth").value,
-        csv: document.querySelector("#csvInput").value,
+        fileName: file.name,
+        fileBase64,
       }),
     });
     document.querySelector("#reconcileResult").innerHTML = `<p class="success">Khớp ${data.matched.length} giao dịch, chưa khớp ${data.unmatched.length} giao dịch.</p>`;

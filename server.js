@@ -384,6 +384,65 @@ function menuTotal(items) {
   return items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
 }
 
+function parseBankAmount(value) {
+  const cleaned = String(value || "").replace(/[^\d-]/g, "");
+  return Number(cleaned || 0);
+}
+
+function normalizeBankRows(rows) {
+  return rows
+    .map((row) => ({
+      date: pick(row, ["date", "ngay", "ngaygiaodich", "transactiondate", "thoigian"]),
+      amount: parseBankAmount(pick(row, ["amount", "sotien", "giaodich", "credit", "sotiengd"])),
+      description: pick(row, ["description", "noidung", "diengiai", "ghichu", "remark", "content"]),
+    }))
+    .filter((row) => row.amount || row.description);
+}
+
+function reconcileBankRows(db, user, month, rows, method) {
+  const debts = buildMonthlyDebts(db, month);
+  const matched = [];
+  const unmatched = [];
+  for (const row of normalizeBankRows(rows)) {
+    const description = String(row.description || "").toUpperCase();
+    const debt = debts.find((d) => row.amount === d.totalAmount && description.includes(d.paymentCode.toUpperCase()));
+    const statement = {
+      id: crypto.randomUUID(),
+      month,
+      date: row.date || "",
+      amount: row.amount,
+      description: row.description || "",
+      importedAt: nowIso(),
+    };
+    db.bankStatements.push(statement);
+    if (debt) {
+      db.payments = db.payments.filter((p) => !(p.month === month && p.employeeCode === debt.employeeCode));
+      db.payments.push({
+        id: crypto.randomUUID(),
+        month,
+        employeeCode: debt.employeeCode,
+        amount: row.amount,
+        paymentCode: debt.paymentCode,
+        status: "paid",
+        paidAt: nowIso(),
+        paidBy: user.employeeCode,
+        method,
+        bankStatementId: statement.id,
+      });
+      const worker = db.users.find((u) => u.employeeCode === debt.employeeCode);
+      if (worker) {
+        worker.registrationLocked = false;
+        worker.lockedReason = "";
+        worker.lockedAt = "";
+      }
+      matched.push({ statement, debt });
+    } else {
+      unmatched.push(statement);
+    }
+  }
+  return { matched, unmatched };
+}
+
 function defaultTelegramTemplates() {
   return {
     debtNotice:
@@ -963,48 +1022,21 @@ async function api(req, res) {
       const month = String(body.month || "");
       const rows = parseCsv(String(body.csv || ""));
       const db = readDb();
-      const debts = buildMonthlyDebts(db, month);
-      const matched = [];
-      const unmatched = [];
-      for (const row of rows) {
-        const amount = Number(String(row.amount || "").replace(/[^\d.-]/g, ""));
-        const description = String(row.description || "").toUpperCase();
-        const debt = debts.find((d) => amount === d.totalAmount && description.includes(d.paymentCode.toUpperCase()));
-        const statement = {
-          id: crypto.randomUUID(),
-          month,
-          date: row.date || "",
-          amount,
-          description: row.description || "",
-          importedAt: nowIso(),
-        };
-        db.bankStatements.push(statement);
-        if (debt) {
-          db.payments = db.payments.filter((p) => !(p.month === month && p.employeeCode === debt.employeeCode));
-          db.payments.push({
-            id: crypto.randomUUID(),
-            month,
-            employeeCode: debt.employeeCode,
-            amount,
-            paymentCode: debt.paymentCode,
-            status: "paid",
-            paidAt: nowIso(),
-            paidBy: user.employeeCode,
-            method: "bank_csv",
-            bankStatementId: statement.id,
-          });
-          const worker = db.users.find((u) => u.employeeCode === debt.employeeCode);
-          if (worker) {
-            worker.registrationLocked = false;
-            worker.lockedReason = "";
-            worker.lockedAt = "";
-          }
-          matched.push({ statement, debt });
-        } else {
-          unmatched.push(statement);
-        }
-      }
+      const { matched, unmatched } = reconcileBankRows(db, user, month, rows, "bank_csv");
       audit(db, user, "RECONCILE_CSV", { month, matched: matched.length, unmatched: unmatched.length });
+      await writeDb(db);
+      return json(res, 200, { matched, unmatched });
+    }
+
+    if (route === "POST /api/payments/reconcile-xlsx") {
+      const user = requireRole(req, res, ["admin"]);
+      if (!user) return;
+      const body = await readBody(req);
+      const month = String(body.month || "");
+      const rows = parseXlsxBase64(body.fileBase64);
+      const db = readDb();
+      const { matched, unmatched } = reconcileBankRows(db, user, month, rows, "bank_xlsx");
+      audit(db, user, "RECONCILE_XLSX", { month, matched: matched.length, unmatched: unmatched.length, fileName: body.fileName || "" });
       await writeDb(db);
       return json(res, 200, { matched, unmatched });
     }
