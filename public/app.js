@@ -10,6 +10,8 @@ const state = {
   tab: "worker",
   adminTab: "members",
   kitchenTab: "menu",
+  dailyReport: null,
+  monthlyReport: null,
 };
 
 const today = new Date().toISOString().slice(0, 10);
@@ -17,6 +19,50 @@ const currentMonth = new Date().toISOString().slice(0, 7);
 
 function money(value) {
   return Number(value || 0).toLocaleString("vi-VN") + " đ";
+}
+
+function escapeExcel(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function excelTable(title, headers, rows) {
+  return `
+    <h3>${escapeExcel(title)}</h3>
+    <table border="1">
+      <thead><tr>${headers.map((header) => `<th>${escapeExcel(header)}</th>`).join("")}</tr></thead>
+      <tbody>
+        ${rows
+          .map((row) => `<tr>${row.map((cell) => `<td style="mso-number-format:'\\@';">${escapeExcel(cell)}</td>`).join("")}</tr>`)
+          .join("")}
+      </tbody>
+    </table>
+    <br />
+  `;
+}
+
+function downloadExcel(filename, title, sections) {
+  const body = sections.map((section) => excelTable(section.title, section.headers, section.rows)).join("");
+  const content = `<!doctype html>
+    <html>
+      <head><meta charset="UTF-8" /></head>
+      <body>
+        <h2>${escapeExcel(title)}</h2>
+        ${body}
+      </body>
+    </html>`;
+  const blob = new Blob(["\ufeff", content], { type: "application/vnd.ms-excel;charset=utf-8" });
+  const link = document.createElement("a");
+  const objectUrl = URL.createObjectURL(blob);
+  link.href = objectUrl;
+  link.download = filename.endsWith(".xls") ? filename : `${filename}.xls`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(objectUrl);
 }
 
 function shiftLabel(shift) {
@@ -792,17 +838,20 @@ function renderDaily() {
       <div class="row">
         <label>Ngày ăn <input id="dailyDate" type="date" value="${today}" /></label>
         <button id="loadDaily">Xem báo cáo</button>
+        <button id="exportDaily" class="secondary">Xuất Excel theo ngày</button>
       </div>
       <div id="dailyContent"></div>
     </section>
   `;
   document.querySelector("#loadDaily").addEventListener("click", loadDailyReport);
+  document.querySelector("#exportDaily").addEventListener("click", exportDailyReport);
   loadDailyReport();
 }
 
 async function loadDailyReport() {
   const date = document.querySelector("#dailyDate").value;
   const data = await api(`/api/reports/daily?mealDate=${encodeURIComponent(date)}`);
+  state.dailyReport = data;
   document.querySelector("#dailyContent").innerHTML = html`
     <div class="summary">
       ${data.summary
@@ -840,6 +889,61 @@ async function loadDailyReport() {
   `;
 }
 
+async function exportDailyReport() {
+  const date = document.querySelector("#dailyDate").value;
+  const data =
+    state.dailyReport && state.dailyReport.mealDate === date
+      ? state.dailyReport
+      : await api(`/api/reports/daily?mealDate=${encodeURIComponent(date)}`);
+  state.dailyReport = data;
+  const menuRows = data.summary.flatMap((s) =>
+    (s.menuItems || []).map((item) => [
+      s.shiftLabel,
+      item.seq,
+      item.name,
+      item.grams,
+      item.unitPrice,
+      item.amount,
+    ])
+  );
+  const orderRows = data.orders.map((o) => [
+    o.employeeCode,
+    o.fullName,
+    o.department,
+    shiftLabel(o.shift),
+    o.price,
+    o.status,
+    o.source,
+  ]);
+  downloadExcel(`bao-cao-ngay-${date}.xls`, `Báo cáo số suất theo ngày ${date}`, [
+    {
+      title: "Tổng hợp theo ca",
+      headers: ["Ca", "Số suất", "Định mức", "Bổ sung sau 08h", "Giá trị thực đơn", "Tiền thu"],
+      rows: [
+        ...data.summary.map((s) => [
+          s.shiftLabel,
+          s.totalQty,
+          s.plannedQty,
+          s.addedAfterCutoffQty,
+          s.totalMenuValue,
+          s.totalAmount,
+        ]),
+        ["Tổng trong ngày", "", "", "", "", data.totalDayAmount],
+      ],
+    },
+    {
+      title: "Định lượng thực đơn",
+      headers: ["Ca", "STT", "Tên món", "Định lượng (gam)", "Đơn giá", "Thành tiền"],
+      rows: menuRows,
+    },
+    {
+      title: "Danh sách chi tiết",
+      headers: ["Mã NV", "Họ tên", "Bộ phận", "Ca", "Giá", "Trạng thái", "Nguồn"],
+      rows: orderRows,
+    },
+  ]);
+}
+
 function renderMonthly() {
   const view = document.querySelector("#view");
   view.innerHTML = html`
@@ -848,17 +952,20 @@ function renderMonthly() {
       <div class="row">
         <label>Tháng <input id="monthInput" type="month" value="${currentMonth}" /></label>
         <button id="loadMonthly">Xem công nợ</button>
+        <button id="exportMonthly" class="secondary">Xuất Excel theo tháng</button>
       </div>
       <div id="monthlyContent"></div>
     </section>
   `;
   document.querySelector("#loadMonthly").addEventListener("click", loadMonthlyReport);
+  document.querySelector("#exportMonthly").addEventListener("click", exportMonthlyReport);
   loadMonthlyReport();
 }
 
 async function loadMonthlyReport() {
   const month = document.querySelector("#monthInput").value;
   const data = await api(`/api/reports/monthly?month=${encodeURIComponent(month)}`);
+  state.monthlyReport = data;
   document.querySelector("#monthlyContent").innerHTML = html`
     <div class="table-wrap">
       <table>
@@ -891,6 +998,37 @@ async function loadMonthlyReport() {
       loadMonthlyReport();
     });
   });
+}
+
+async function exportMonthlyReport() {
+  const month = document.querySelector("#monthInput").value;
+  const data =
+    state.monthlyReport && state.monthlyReport.month === month
+      ? state.monthlyReport
+      : await api(`/api/reports/monthly?month=${encodeURIComponent(month)}`);
+  state.monthlyReport = data;
+  const rows = data.debts.map((d) => {
+    const user = state.users.find((u) => u.employeeCode === d.employeeCode) || {};
+    return [
+      d.employeeCode,
+      user.phone || "",
+      d.fullName,
+      d.department,
+      d.lunchQty,
+      d.dinnerQty,
+      d.totalAmount,
+      d.paymentCode,
+      d.qrUrl,
+      d.status === "paid" ? "Đã thanh toán" : "Chưa thanh toán",
+    ];
+  });
+  downloadExcel(`cong-no-thang-${month}.xls`, `Công nợ tiền cơm tháng ${month}`, [
+    {
+      title: "Công nợ tiền cơm tháng",
+      headers: ["Mã NV", "Số điện thoại", "Họ tên", "Bộ phận", "Trưa", "Tối", "Tổng tiền", "Nội dung CK", "Link QR", "Trạng thái"],
+      rows,
+    },
+  ]);
 }
 
 function renderReconcile() {
