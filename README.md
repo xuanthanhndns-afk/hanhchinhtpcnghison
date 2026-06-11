@@ -93,24 +93,40 @@ So thu tu,Ho va ten,Bo phan,So dien thoai
 
 ## Luu y luu tru du lieu khi dua len Render
 
-He thong co the luu du lieu vao file theo bien moi truong `DATA_FILE`. Khi chay local, neu khong cau hinh bien nay thi he thong dung file mau `data/db.json`.
+He thong uu tien luu du lieu vao PostgreSQL neu co bien moi truong `DATABASE_URL`. Neu khong co `DATABASE_URL`, he thong moi luu vao file theo bien `DATA_FILE` hoac file mau `data/db.json`.
 
-Khi dua len Render, can gan Persistent Disk de du lieu khong mat sau moi lan deploy/restart:
+### Phuong an mien phi khuyen dung: Neon PostgreSQL
+
+Render Free khong cho gan Persistent Disk, vi vay can dung PostgreSQL ben ngoai de khong mat du lieu sau moi lan deploy.
+
+1. Tao tai khoan tai `https://neon.com`.
+2. Tao project PostgreSQL mien phi.
+3. Copy connection string dang `postgresql://...`.
+4. Vao Render service `hanhchinhtpcnghison` > `Environment`.
+5. Them bien:
+
+```text
+DATABASE_URL=postgresql://...
+```
+
+6. Luu va deploy lai service.
+
+Khi co `DATABASE_URL`, toan bo du lieu thanh vien, thuc don, dang ky com, thanh toan, dau bep se luu trong PostgreSQL, khong bi xoa khi em day code moi.
+
+### Phuong an tra phi: Render Persistent Disk
+
+Neu nang Render len plan co ho tro Disk, co the dung file data tren disk:
 
 1. Vao Render service `hanhchinhtpcnghison`.
 2. Vao muc `Disks`, tao disk moi.
 3. Chon mount path: `/var/data`.
-4. Trong `Environment`, dam bao co bien:
+4. Trong `Environment`, them bien:
 
 ```text
 DATA_FILE=/var/data/db.json
 ```
 
-File `render.yaml` da khai bao san bien `DATA_FILE=/var/data/db.json`. Neu khong gan Persistent Disk tai `/var/data`, file van co the bi mat khi Render redeploy/restart.
-
-Luu y: Render Persistent Disk chi gan duoc cho web service tra phi. Neu tiep tuc dung plan `free`, nen chuyen sang co so du lieu ben ngoai nhu PostgreSQL de tranh mat du lieu khi deploy.
-
-Voi nhu cau van hanh lau dai, nen chuyen sang PostgreSQL hoac gan Persistent Disk de luu du lieu ben vung.
+Luu y: Render Persistent Disk chi gan duoc cho web service tra phi. Neu tiep tuc dung plan `free`, hay dung `DATABASE_URL` voi Neon PostgreSQL.
 
 ## Mau CSV sao ke
 

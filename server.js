@@ -2,6 +2,12 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+let Pool = null;
+try {
+  ({ Pool } = require("pg"));
+} catch {
+  Pool = null;
+}
 let XLSX = null;
 try {
   XLSX = require("xlsx");
@@ -15,8 +21,11 @@ const DATA_FILE = process.env.DATA_FILE ? path.resolve(process.env.DATA_FILE) : 
 const PUBLIC_DIR = path.join(__dirname, "public");
 const TEMPLATES_DIR = path.join(__dirname, "templates");
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
+const DATABASE_URL = process.env.DATABASE_URL || "";
 
 const sessions = new Map();
+let pgPool = null;
+let memoryDb = null;
 
 function ensureDataFile() {
   const dataDir = path.dirname(DATA_FILE);
@@ -27,15 +36,48 @@ function ensureDataFile() {
 }
 
 function readDb() {
+  if (memoryDb) return JSON.parse(JSON.stringify(memoryDb));
   ensureDataFile();
   return JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
 }
 
-function writeDb(db) {
+async function writeDb(db) {
+  if (pgPool) {
+    memoryDb = JSON.parse(JSON.stringify(db));
+    await pgPool.query(
+      "insert into app_state (id, data, updated_at) values ($1, $2::jsonb, now()) on conflict (id) do update set data = excluded.data, updated_at = now()",
+      ["main", JSON.stringify(memoryDb)]
+    );
+    return;
+  }
   ensureDataFile();
   const tempFile = `${DATA_FILE}.tmp`;
   fs.writeFileSync(tempFile, JSON.stringify(db, null, 2), "utf8");
   fs.renameSync(tempFile, DATA_FILE);
+}
+
+async function initDb() {
+  if (!DATABASE_URL) {
+    ensureDataFile();
+    return;
+  }
+  if (!Pool) {
+    throw new Error("Chua cai thu vien PostgreSQL. Vui long chay npm install hoac doi Render deploy xong.");
+  }
+  pgPool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: DATABASE_URL.includes("localhost") ? false : { rejectUnauthorized: false },
+  });
+  await pgPool.query(
+    "create table if not exists app_state (id text primary key, data jsonb not null, updated_at timestamptz not null default now())"
+  );
+  const result = await pgPool.query("select data from app_state where id = $1", ["main"]);
+  if (result.rows.length) {
+    memoryDb = result.rows[0].data;
+    return;
+  }
+  memoryDb = JSON.parse(fs.readFileSync(SEED_DATA_FILE, "utf8"));
+  await pgPool.query("insert into app_state (id, data) values ($1, $2::jsonb)", ["main", JSON.stringify(memoryDb)]);
 }
 
 function nowIso() {
@@ -475,7 +517,7 @@ async function api(req, res) {
         return json(res, 400, { error: "Khong nhap duoc dong nao. Vui long kiem tra file co dung cot: So thu tu, Ho va ten, Bo phan, So dien thoai." });
       }
       audit(db, user, "IMPORT_WORKERS", { created, updated });
-      writeDb(db);
+      await writeDb(db);
       return json(res, 200, { created, updated });
     }
 
@@ -489,7 +531,7 @@ async function api(req, res) {
       if (!worker) return json(res, 404, { error: "Khong tim thay cong nhan" });
       db.users = db.users.filter((u) => u.id !== worker.id);
       audit(db, user, "DELETE_WORKER", { employeeCode });
-      writeDb(db);
+      await writeDb(db);
       return json(res, 200, { ok: true });
     }
 
@@ -504,7 +546,7 @@ async function api(req, res) {
       worker.password = "123456";
       worker.mustChangePassword = true;
       audit(db, user, "RESET_WORKER_PASSWORD", { employeeCode });
-      writeDb(db);
+      await writeDb(db);
       return json(res, 200, { ok: true });
     }
 
@@ -524,7 +566,7 @@ async function api(req, res) {
       }
       Object.assign(chef, { fullName, phone, updatedAt: nowIso(), updatedBy: user.employeeCode });
       audit(db, user, "UPSERT_CHEF", { chefId: chef.id, phone });
-      writeDb(db);
+      await writeDb(db);
       return json(res, 200, { chef });
     }
 
@@ -543,7 +585,7 @@ async function api(req, res) {
         menu.chefs = (menu.chefs || []).filter((item) => item.id !== id);
       }
       audit(db, user, "DELETE_CHEF", { chefId: id, phone: chef.phone });
-      writeDb(db);
+      await writeDb(db);
       return json(res, 200, { ok: true });
     }
 
@@ -562,7 +604,7 @@ async function api(req, res) {
       saved.password = newPassword;
       saved.mustChangePassword = false;
       audit(db, saved, "CHANGE_PASSWORD", { employeeCode: saved.employeeCode });
-      writeDb(db);
+      await writeDb(db);
       return json(res, 200, { ok: true });
     }
 
@@ -574,7 +616,7 @@ async function api(req, res) {
       const saved = db.users.find((u) => u.id === user.id);
       saved.telegramChatId = String(body.telegramChatId || "").trim();
       audit(db, saved, "UPDATE_TELEGRAM", { employeeCode: saved.employeeCode });
-      writeDb(db);
+      await writeDb(db);
       return json(res, 200, { user: sanitizeUser(saved) });
     }
 
@@ -616,7 +658,7 @@ async function api(req, res) {
         updatedAt: nowIso(),
       });
       audit(db, user, "UPSERT_MENU", { mealDate, shift });
-      writeDb(db);
+      await writeDb(db);
       return json(res, 200, { menu });
     }
 
@@ -671,7 +713,7 @@ async function api(req, res) {
       db.orders = db.orders.filter((o) => o.id !== order.id);
       db.orders.push(order);
       audit(db, user, "REGISTER_ORDER", { employeeCode, mealDate, shift, status: order.status });
-      writeDb(db);
+      await writeDb(db);
       return json(res, 200, { order });
     }
 
@@ -697,7 +739,7 @@ async function api(req, res) {
       order.operatedBy = user.employeeCode;
       order.note = String(body.note || order.note || "");
       audit(db, user, "CANCEL_ORDER", { employeeCode, mealDate, shift, status: order.status });
-      writeDb(db);
+      await writeDb(db);
       return json(res, 200, { order });
     }
 
@@ -791,7 +833,7 @@ async function api(req, res) {
         worker.lockedAt = "";
       }
       audit(db, user, "MARK_PAID", { month, employeeCode, amount: debt.totalAmount });
-      writeDb(db);
+      await writeDb(db);
       return json(res, 200, { ok: true });
     }
 
@@ -844,7 +886,7 @@ async function api(req, res) {
         }
       }
       audit(db, user, "RECONCILE_CSV", { month, matched: matched.length, unmatched: unmatched.length });
-      writeDb(db);
+      await writeDb(db);
       return json(res, 200, { matched, unmatched });
     }
 
@@ -873,7 +915,7 @@ async function api(req, res) {
         results.push({ employeeCode: debt.employeeCode, result });
       }
       audit(db, user, "TELEGRAM_REMIND", { month, count: results.length });
-      writeDb(db);
+      await writeDb(db);
       return json(res, 200, { results });
     }
 
@@ -893,6 +935,14 @@ const server = http.createServer((req, res) => {
   return serveStatic(req, res);
 });
 
-server.listen(PORT, "0.0.0.0", () => {
-  console.log(`Meal shift web running at http://localhost:${PORT}`);
-});
+initDb()
+  .then(() => {
+    server.listen(PORT, "0.0.0.0", () => {
+      console.log(`Meal shift web running at http://localhost:${PORT}`);
+      console.log(`Data store: ${DATABASE_URL ? "PostgreSQL" : DATA_FILE}`);
+    });
+  })
+  .catch((err) => {
+    console.error("Cannot start server:", err);
+    process.exit(1);
+  });
