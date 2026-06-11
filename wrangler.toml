@@ -1,6 +1,12 @@
 name = "hanhchinhtpcnghison"
 compatibility_date = "2026-06-11"
-pages_build_output_dir = "public"
+main = "src/worker.js"
 
-# Khi tao Cloudflare Pages tren dashboard, gan D1 binding ten DB.
-# Migration schema nam tai migrations/0001_cloudflare_d1.sql.
+assets = { directory = "./public", binding = "ASSETS" }
+
+[[d1_databases]]
+binding = "DB"
+database_name = "hanhchinhtpcnghison"
+database_id = "e3cb77af-637f-4dd4-ab34-1abe46b8f94a"
+
+# Neu tao D1 database moi, thay database_id bang ID cua D1 database moi.
