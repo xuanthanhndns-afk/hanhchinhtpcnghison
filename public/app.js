@@ -103,8 +103,8 @@ function renderLogin() {
         <button>Đăng nhập</button>
         <div id="loginMessage"></div>
       </form>
-      <p class="muted login-help">Quên mật khẩu? Vui lòng liên hệ Admin để đặt lại mật khẩu mặc định 123456.</p>
-      <p class="muted copyright">Copyright @EVNGENCO1TPCNGHISON</p>
+      <p class="muted login-help">Quên mật khẩu? Vui lòng liên hệ Admin để đặt lại mật khẩu.</p>
+      <p class="muted copyright">Copyright @2026 EVNGENCO1TPCNGHISON</p>
     </main>
   `;
   document.querySelector("#loginForm").addEventListener("submit", async (event) => {
@@ -774,9 +774,10 @@ async function loadDailyReport() {
     <div class="summary">
       ${data.summary
         .map(
-          (s) => `<div class="metric"><span>${s.shiftLabel}</span><strong>${s.totalQty}</strong><small>Định mức ${s.plannedQty}, bổ sung ${s.addedAfterCutoffQty}, giá trị thực đơn ${money(s.totalMenuValue)}</small></div>`
+          (s) => `<div class="metric"><span>${s.shiftLabel}</span><strong>${s.totalQty}</strong><small>Định mức ${s.plannedQty}, bổ sung ${s.addedAfterCutoffQty}, giá trị thực đơn ${money(s.totalMenuValue)}, tiền thu ${money(s.totalAmount)}</small></div>`
         )
         .join("")}
+      <div class="metric"><span>Tổng tiền thu trong ngày</span><strong>${money(data.totalDayAmount)}</strong><small>Tổng tiền ca trưa và ca tối</small></div>
     </div>
     <h3>Định lượng thực đơn</h3>
     <div class="table-wrap">

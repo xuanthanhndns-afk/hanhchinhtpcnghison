@@ -709,6 +709,7 @@ async function api(req, res) {
         const menu = getMenu(db, mealDate, shift);
         const rows = orders.filter((o) => o.shift === shift);
         const added = rows.filter((o) => o.status === "added_after_cutoff").length;
+        const totalAmount = rows.reduce((sum, order) => sum + Number(order.price || 0), 0);
         return {
           shift,
           shiftLabel: shiftLabel(shift),
@@ -718,9 +719,11 @@ async function api(req, res) {
           registeredQty: rows.length - added,
           addedAfterCutoffQty: added,
           totalQty: rows.length,
+          totalAmount,
         };
       });
-      return json(res, 200, { mealDate, summary, orders });
+      const totalDayAmount = summary.reduce((sum, item) => sum + item.totalAmount, 0);
+      return json(res, 200, { mealDate, summary, totalDayAmount, orders });
     }
 
     if (route === "GET /api/reports/monthly") {
