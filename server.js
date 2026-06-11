@@ -10,19 +10,32 @@ try {
 }
 
 const PORT = Number(process.env.PORT || 3000);
-const DATA_FILE = path.join(__dirname, "data", "db.json");
+const SEED_DATA_FILE = path.join(__dirname, "data", "db.json");
+const DATA_FILE = process.env.DATA_FILE ? path.resolve(process.env.DATA_FILE) : SEED_DATA_FILE;
 const PUBLIC_DIR = path.join(__dirname, "public");
 const TEMPLATES_DIR = path.join(__dirname, "templates");
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 
 const sessions = new Map();
 
+function ensureDataFile() {
+  const dataDir = path.dirname(DATA_FILE);
+  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+  if (!fs.existsSync(DATA_FILE)) {
+    fs.copyFileSync(SEED_DATA_FILE, DATA_FILE);
+  }
+}
+
 function readDb() {
+  ensureDataFile();
   return JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
 }
 
 function writeDb(db) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2), "utf8");
+  ensureDataFile();
+  const tempFile = `${DATA_FILE}.tmp`;
+  fs.writeFileSync(tempFile, JSON.stringify(db, null, 2), "utf8");
+  fs.renameSync(tempFile, DATA_FILE);
 }
 
 function nowIso() {

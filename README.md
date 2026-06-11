@@ -93,7 +93,24 @@ So thu tu,Ho va ten,Bo phan,So dien thoai
 
 ## Luu y luu tru du lieu khi dua len Render
 
-Ban hien tai luu du lieu vao file `data/db.json`. Neu chay tren Render ma khong gan persistent disk hoac database rieng, du lieu nhap moi co the mat khi service redeploy/restart. Giai doan sau nen chuyen sang PostgreSQL hoac gan persistent disk de luu du lieu ben vung.
+He thong co the luu du lieu vao file theo bien moi truong `DATA_FILE`. Khi chay local, neu khong cau hinh bien nay thi he thong dung file mau `data/db.json`.
+
+Khi dua len Render, can gan Persistent Disk de du lieu khong mat sau moi lan deploy/restart:
+
+1. Vao Render service `hanhchinhtpcnghison`.
+2. Vao muc `Disks`, tao disk moi.
+3. Chon mount path: `/var/data`.
+4. Trong `Environment`, dam bao co bien:
+
+```text
+DATA_FILE=/var/data/db.json
+```
+
+File `render.yaml` da khai bao san bien `DATA_FILE=/var/data/db.json`. Neu khong gan Persistent Disk tai `/var/data`, file van co the bi mat khi Render redeploy/restart.
+
+Luu y: Render Persistent Disk chi gan duoc cho web service tra phi. Neu tiep tuc dung plan `free`, nen chuyen sang co so du lieu ben ngoai nhu PostgreSQL de tranh mat du lieu khi deploy.
+
+Voi nhu cau van hanh lau dai, nen chuyen sang PostgreSQL hoac gan Persistent Disk de luu du lieu ben vung.
 
 ## Mau CSV sao ke
 
