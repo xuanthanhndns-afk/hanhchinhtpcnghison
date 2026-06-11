@@ -540,8 +540,10 @@ async function api(req, res) {
       const body = await readBody(req);
       const currentPassword = String(body.currentPassword || "");
       const newPassword = String(body.newPassword || "");
+      const confirmPassword = String(body.confirmPassword || "");
       if (user.password !== currentPassword) return json(res, 400, { error: "Mat khau hien tai khong dung" });
       if (newPassword.length < 6) return json(res, 400, { error: "Mat khau moi can toi thieu 6 ky tu" });
+      if (newPassword !== confirmPassword) return json(res, 400, { error: "Mat khau moi va nhac lai mat khau khong khop" });
       const db = readDb();
       const saved = db.users.find((u) => u.id === user.id);
       saved.password = newPassword;

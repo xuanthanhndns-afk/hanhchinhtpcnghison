@@ -189,6 +189,19 @@ label {
   gap: 14px;
 }
 
+.password-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.password-toggle {
+  min-width: 64px;
+  height: 40px;
+  padding: 8px 10px;
+}
+
 .two-cols {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }

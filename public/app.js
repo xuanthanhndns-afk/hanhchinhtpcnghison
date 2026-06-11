@@ -338,6 +338,29 @@ function collectSelectedChefIds() {
   return [...document.querySelectorAll("[data-chef-check]:checked")].map((input) => input.value);
 }
 
+function passwordField(label, name, autocomplete) {
+  return html`
+    <label>${label}
+      <span class="password-control">
+        <input name="${name}" type="password" autocomplete="${autocomplete}" />
+        <button type="button" class="secondary password-toggle" data-toggle-password="${name}">Hiện</button>
+      </span>
+    </label>
+  `;
+}
+
+function attachPasswordToggles() {
+  document.querySelectorAll("[data-toggle-password]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const input = document.querySelector(`[name="${btn.dataset.togglePassword}"]`);
+      if (!input) return;
+      const show = input.type === "password";
+      input.type = show ? "text" : "password";
+      btn.textContent = show ? "Ẩn" : "Hiện";
+    });
+  });
+}
+
 function validateSelectedChefs() {
   if (collectSelectedChefIds().length) return true;
   setMessage("#menuMessage", "Vui lòng chọn ít nhất một đầu bếp thực hiện trước khi lưu định lượng bữa ăn.", "error");
@@ -968,8 +991,9 @@ function renderProfile(forcePasswordChange = false) {
         <h2>${forcePasswordChange ? "Yêu cầu đổi mật khẩu" : "Đổi mật khẩu"}</h2>
         ${forcePasswordChange ? `<p class="notice">Tài khoản đang dùng mật khẩu mặc định 123456. Vui lòng đổi mật khẩu mới để tiếp tục sử dụng.</p>` : ""}
         <form id="passwordForm" class="form-grid">
-          <label>Mật khẩu hiện tại <input name="currentPassword" type="password" /></label>
-          <label>Mật khẩu mới <input name="newPassword" type="password" /></label>
+          ${passwordField("Mật khẩu hiện tại", "currentPassword", "current-password")}
+          ${passwordField("Mật khẩu mới", "newPassword", "new-password")}
+          ${passwordField("Nhắc lại mật khẩu mới", "confirmPassword", "new-password")}
           <button>Đổi mật khẩu</button>
           <div id="passwordMessage"></div>
         </form>
@@ -984,6 +1008,7 @@ function renderProfile(forcePasswordChange = false) {
       </section>
     </div>
   `;
+  attachPasswordToggles();
   document.querySelector("#passwordForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     try {
