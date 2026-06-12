@@ -1591,19 +1591,53 @@ async function loadMonthlyReport() {
   const month = document.querySelector("#monthInput").value;
   const data = await api(`/api/reports/monthly?month=${encodeURIComponent(month)}`);
   state.monthlyReport = data;
+  const [year, mm] = month.split("-");
+  const visibleDebts =
+    state.user.role === "worker" && !data.debts.length
+      ? [
+          {
+            employeeCode: state.user.employeeCode,
+            fullName: state.user.fullName,
+            department: state.user.department,
+            lunchQty: 0,
+            dinnerQty: 0,
+            totalQty: 0,
+            totalAmount: 0,
+            paymentCode: `${state.user.phone || state.user.employeeCode} COM T${mm}-${year}`,
+            qrUrl: "",
+            status: "unpaid",
+          },
+        ]
+      : data.debts;
+  const monthlyTotals = visibleDebts.reduce(
+    (sum, item) => {
+      sum.lunchQty += Number(item.lunchQty || 0);
+      sum.dinnerQty += Number(item.dinnerQty || 0);
+      sum.totalQty += Number(item.totalQty || item.lunchQty + item.dinnerQty || 0);
+      sum.totalAmount += Number(item.totalAmount || 0);
+      return sum;
+    },
+    { lunchQty: 0, dinnerQty: 0, totalQty: 0, totalAmount: 0 }
+  );
   document.querySelector("#monthlyContent").innerHTML = html`
+    <div class="summary">
+      <div class="metric"><span>Suất trưa trong tháng</span><strong>${monthlyTotals.lunchQty}</strong><small>Ca trưa</small></div>
+      <div class="metric"><span>Suất tối trong tháng</span><strong>${monthlyTotals.dinnerQty}</strong><small>Ca tối</small></div>
+      <div class="metric"><span>Tổng số suất</span><strong>${monthlyTotals.totalQty}</strong><small>Tháng ${mm}/${year}</small></div>
+      <div class="metric"><span>Tổng tiền trong tháng</span><strong class="money-red">${money(monthlyTotals.totalAmount)}</strong><small>Số tiền cần thanh toán</small></div>
+    </div>
     <div class="table-wrap">
       <table>
         <thead>
           <tr><th>Mã NV</th><th>Số điện thoại</th><th>Họ tên</th><th>Bộ phận</th><th>Trưa</th><th>Tối</th><th>Tổng tiền</th><th>Nội dung CK</th><th>QR</th><th>Trạng thái</th><th></th></tr>
         </thead>
         <tbody>
-          ${data.debts
+          ${visibleDebts
             .map((d) => {
               const user = state.users.find((u) => u.employeeCode === d.employeeCode) || {};
               return `<tr>
                 <td>${d.employeeCode}</td><td>${user.phone || state.user.phone || ""}</td><td>${d.fullName}</td><td>${d.department}</td><td>${d.lunchQty}</td><td>${d.dinnerQty}</td><td>${money(d.totalAmount)}</td>
-                <td>${d.paymentCode}</td><td><img class="qr" src="${d.qrUrl}" alt="QR ${d.employeeCode}" /></td>
+                <td>${d.paymentCode}</td><td>${d.qrUrl ? `<img class="qr" src="${d.qrUrl}" alt="QR ${d.employeeCode}" />` : ""}</td>
                 <td><span class="status ${d.status === "paid" ? "ok" : "warn"}">${d.status === "paid" ? "Đã thanh toán" : "Chưa thanh toán"}</span></td>
                 <td>${state.user.role === "admin" ? `<button data-paid="${d.employeeCode}" data-month="${data.month}">Đã thu</button>` : ""}</td>
               </tr>`;
