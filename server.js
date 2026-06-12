@@ -262,6 +262,14 @@ function isBeforeCutoff(mealDate, cutoffTime) {
   return Date.now() < vietnamCutoffUtc;
 }
 
+function vietnamTodayIso() {
+  return new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function isPastMealDate(mealDate) {
+  return String(mealDate || "").slice(0, 10) < vietnamTodayIso();
+}
+
 function orderKey(employeeCode, mealDate, shift) {
   return `${employeeCode}|${mealDate}|${shift}`;
 }
@@ -888,6 +896,9 @@ async function api(req, res) {
       const worker = db.users.find((u) => u.employeeCode === employeeCode && u.role === "worker");
       if (!worker) return json(res, 404, { error: "Khong tim thay cong nhan" });
       const mealDate = String(body.mealDate || "").slice(0, 10);
+      if (user.role === "worker" && isPastMealDate(mealDate)) {
+        return json(res, 400, { error: "Không thể đăng ký suất ăn cho ngày đã qua" });
+      }
       const shift = normalizeShift(body.shift);
       const beforeCutoff = isBeforeCutoff(mealDate, db.settings.cutoffTime);
       if (!beforeCutoff && user.role === "worker") {
@@ -934,6 +945,9 @@ async function api(req, res) {
       }
       const employeeCode = user.role === "worker" ? user.employeeCode : String(body.employeeCode || "");
       const mealDate = String(body.mealDate || "").slice(0, 10);
+      if (user.role === "worker" && isPastMealDate(mealDate)) {
+        return json(res, 400, { error: "Không thể hủy đăng ký suất ăn của ngày đã qua" });
+      }
       const shift = normalizeShift(body.shift);
       const order = db.orders.find(
         (o) => o.employeeCode === employeeCode && o.mealDate === mealDate && o.shift === shift

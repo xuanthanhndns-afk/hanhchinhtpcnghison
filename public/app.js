@@ -15,8 +15,11 @@ const state = {
   monthlyReport: null,
 };
 
-const today = new Date().toISOString().slice(0, 10);
-const currentMonth = new Date().toISOString().slice(0, 7);
+const today = (() => {
+  const date = new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+})();
+const currentMonth = today.slice(0, 7);
 
 function dateFromIso(value) {
   const [year, month, day] = String(value || today).slice(0, 10).split("-").map(Number);
@@ -29,6 +32,10 @@ function isoFromDate(date) {
 
 function formatDate(value) {
   return dateFromIso(value).toLocaleDateString("vi-VN");
+}
+
+function isPastDate(value) {
+  return String(value || "").slice(0, 10) < today;
 }
 
 function money(value) {
@@ -725,13 +732,13 @@ async function renderWorker() {
             </select>
           </label>
           <label class="worker-date-field" data-mode-field="day">Ngày ăn
-            <input id="workerDate" type="date" value="${today}" />
+            <input id="workerDate" type="date" min="${today}" value="${today}" />
           </label>
           <label class="worker-date-field hidden" data-mode-field="week">Chọn một ngày trong tuần
-            <input id="workerWeekDate" type="date" value="${today}" />
+            <input id="workerWeekDate" type="date" min="${today}" value="${today}" />
           </label>
           <label class="worker-date-field hidden" data-mode-field="month">Tháng đăng ký
-            <input id="workerMonth" type="month" value="${currentMonth}" />
+            <input id="workerMonth" type="month" min="${currentMonth}" value="${currentMonth}" />
           </label>
           <fieldset class="shift-picker">
             <legend>Ca ăn</legend>
@@ -769,7 +776,10 @@ function selectedWorkerShifts() {
 
 function workerBaseRangeDates() {
   const mode = document.querySelector("#workerRegisterMode").value;
-  if (mode === "day") return [document.querySelector("#workerDate").value || today];
+  if (mode === "day") {
+    const date = document.querySelector("#workerDate").value || today;
+    return isPastDate(date) ? [] : [date];
+  }
   if (mode === "week") {
     const selected = dateFromIso(document.querySelector("#workerWeekDate").value || today);
     const day = selected.getDay() || 7;
@@ -834,13 +844,14 @@ function renderWorkerCalendar() {
       <div class="calendar-grid">
         ${blanks}
         ${dates
-          .map(
-            (date) => `<label class="calendar-day selected">
-              <input type="checkbox" data-worker-calendar-date value="${date}" checked />
+          .map((date) => {
+            const past = isPastDate(date);
+            return `<label class="calendar-day ${past ? "disabled" : "selected"}">
+              <input type="checkbox" data-worker-calendar-date value="${date}" ${past ? "disabled" : "checked"} />
               <span>${dateFromIso(date).getDate()}</span>
-              <small>${formatDate(date)}</small>
-            </label>`
-          )
+              <small>${formatDate(date)}${past ? " - Đã qua" : ""}</small>
+            </label>`;
+          })
           .join("")}
       </div>
     </div>
@@ -854,6 +865,7 @@ function renderWorkerCalendar() {
   });
   calendar.querySelector("#selectAllWorkerDates").addEventListener("click", () => {
     calendar.querySelectorAll("[data-worker-calendar-date]").forEach((input) => {
+      if (input.disabled) return;
       input.checked = true;
       input.closest(".calendar-day").classList.add("selected");
     });
