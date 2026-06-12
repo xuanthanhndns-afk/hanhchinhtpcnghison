@@ -261,6 +261,70 @@ label {
   margin-right: 18px;
 }
 
+.calendar-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  margin: 12px 0;
+  background: #fff;
+}
+
+.calendar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.calendar-weekdays,
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.calendar-weekdays span {
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.calendar-day {
+  min-height: 72px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+  background: #f8fafc;
+  cursor: pointer;
+}
+
+.calendar-day.blank {
+  border: 0;
+  background: transparent;
+  cursor: default;
+}
+
+.calendar-day input {
+  margin-right: 6px;
+}
+
+.calendar-day span {
+  font-weight: 700;
+}
+
+.calendar-day small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.calendar-day.selected {
+  border-color: var(--accent);
+  background: #eaf6fa;
+}
+
 .copyright {
   margin-top: 18px;
   text-align: center;
@@ -595,5 +659,19 @@ tr:last-child td {
 
   .system-stats {
     grid-template-columns: 1fr;
+  }
+
+  .calendar-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .calendar-weekdays,
+  .calendar-grid {
+    min-width: 640px;
+  }
+
+  .calendar-panel {
+    overflow-x: auto;
   }
 }

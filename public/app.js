@@ -745,6 +745,7 @@ async function renderWorker() {
           <button id="reloadWorker" class="secondary">Xem thông tin</button>
           <button id="exportWorkerDay" class="secondary">Xuất Excel theo ngày</button>
         </div>
+        <div id="workerCalendar"></div>
         <div id="workerRangePreview"></div>
         <div id="workerMeals"></div>
       </section>
@@ -766,7 +767,7 @@ function selectedWorkerShifts() {
   return Array.from(document.querySelectorAll("[name='workerShift']:checked")).map((input) => input.value);
 }
 
-function workerRangeDates() {
+function workerBaseRangeDates() {
   const mode = document.querySelector("#workerRegisterMode").value;
   if (mode === "day") return [document.querySelector("#workerDate").value || today];
   if (mode === "week") {
@@ -785,6 +786,12 @@ function workerRangeDates() {
   return Array.from({ length: end }, (_, index) => `${month}-${String(index + 1).padStart(2, "0")}`);
 }
 
+function workerRangeDates() {
+  const calendarInputs = Array.from(document.querySelectorAll("[data-worker-calendar-date]"));
+  if (calendarInputs.length) return calendarInputs.filter((input) => input.checked).map((input) => input.value);
+  return workerBaseRangeDates();
+}
+
 function workerRangeItems() {
   const shifts = selectedWorkerShifts();
   return workerRangeDates().flatMap((date) => shifts.map((shift) => ({ date, shift })));
@@ -795,15 +802,79 @@ function updateWorkerRangeView() {
   document.querySelectorAll("[data-mode-field]").forEach((field) => {
     field.classList.toggle("hidden", field.dataset.modeField !== mode);
   });
+  renderWorkerCalendar();
   renderWorkerRangePreview();
   renderWorkerMeals();
+}
+
+function renderWorkerCalendar() {
+  const calendar = document.querySelector("#workerCalendar");
+  const mode = document.querySelector("#workerRegisterMode").value;
+  if (mode === "day") {
+    calendar.innerHTML = "";
+    return;
+  }
+  const dates = workerBaseRangeDates();
+  const monthMode = mode === "month";
+  const firstDate = dateFromIso(dates[0]);
+  const offset = monthMode ? (firstDate.getDay() + 6) % 7 : 0;
+  const blanks = Array.from({ length: offset }, () => `<div class="calendar-day blank"></div>`).join("");
+  calendar.innerHTML = html`
+    <div class="calendar-panel">
+      <div class="calendar-head">
+        <strong>${monthMode ? `Lịch tháng ${document.querySelector("#workerMonth").value || currentMonth}` : `Lịch tuần ${formatDate(dates[0])} - ${formatDate(dates[dates.length - 1])}`}</strong>
+        <div class="actions">
+          <button type="button" class="secondary" id="selectAllWorkerDates">Chọn tất cả</button>
+          <button type="button" class="secondary" id="clearWorkerDates">Bỏ chọn</button>
+        </div>
+      </div>
+      <div class="calendar-weekdays">
+        ${["T2", "T3", "T4", "T5", "T6", "T7", "CN"].map((day) => `<span>${day}</span>`).join("")}
+      </div>
+      <div class="calendar-grid">
+        ${blanks}
+        ${dates
+          .map(
+            (date) => `<label class="calendar-day selected">
+              <input type="checkbox" data-worker-calendar-date value="${date}" checked />
+              <span>${dateFromIso(date).getDate()}</span>
+              <small>${formatDate(date)}</small>
+            </label>`
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+  calendar.querySelectorAll("[data-worker-calendar-date]").forEach((input) => {
+    input.addEventListener("change", () => {
+      input.closest(".calendar-day").classList.toggle("selected", input.checked);
+      renderWorkerRangePreview();
+      renderWorkerMeals();
+    });
+  });
+  calendar.querySelector("#selectAllWorkerDates").addEventListener("click", () => {
+    calendar.querySelectorAll("[data-worker-calendar-date]").forEach((input) => {
+      input.checked = true;
+      input.closest(".calendar-day").classList.add("selected");
+    });
+    renderWorkerRangePreview();
+    renderWorkerMeals();
+  });
+  calendar.querySelector("#clearWorkerDates").addEventListener("click", () => {
+    calendar.querySelectorAll("[data-worker-calendar-date]").forEach((input) => {
+      input.checked = false;
+      input.closest(".calendar-day").classList.remove("selected");
+    });
+    renderWorkerRangePreview();
+    renderWorkerMeals();
+  });
 }
 
 function renderWorkerRangePreview() {
   const preview = document.querySelector("#workerRangePreview");
   const items = workerRangeItems();
   if (!items.length) {
-    preview.innerHTML = `<div class="notice bad-notice">Vui lòng chọn ít nhất một ca ăn.</div>`;
+    preview.innerHTML = `<div class="notice bad-notice">Vui lòng chọn ít nhất một ngày và ít nhất một ca ăn.</div>`;
     return;
   }
   const firstDate = items[0].date;
@@ -818,9 +889,17 @@ function renderWorkerRangePreview() {
 
 function renderWorkerMeals() {
   const dates = workerRangeDates();
-  const date = dates[0] || today;
+  const date = dates[0];
   const container = document.querySelector("#workerMeals");
   const disabled = state.user.registrationLockedNow ? "disabled" : "";
+  if (!date || !selectedWorkerShifts().length) {
+    container.innerHTML = html`
+      ${state.user.registrationLockedNow ? `<div class="notice bad-notice">Không thể đăng ký cơm cho đến khi thanh toán thành công.</div>` : ""}
+      <div class="notice bad-notice">Vui lòng chọn ít nhất một ngày và ít nhất một ca ăn để xem thông tin suất ăn.</div>
+      <div id="workerMessage"></div>
+    `;
+    return;
+  }
   container.innerHTML = html`
     ${state.user.registrationLockedNow ? `<div class="notice bad-notice">Không thể đăng ký cơm cho đến khi thanh toán thành công.</div>` : ""}
     <h3>Thông tin suất ăn ngày ${formatDate(date)}</h3>
