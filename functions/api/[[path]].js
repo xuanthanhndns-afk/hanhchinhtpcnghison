@@ -249,10 +249,11 @@ function dueDateForMonth(month, graceDays) {
 }
 
 function isBeforeCutoff(mealDate, cutoffTime) {
+  const [year, month, day] = String(mealDate || "").slice(0, 10).split("-").map(Number);
   const [hour, minute] = String(cutoffTime || "08:00").split(":").map(Number);
-  const cutoff = new Date(`${mealDate}T00:00:00`);
-  cutoff.setHours(hour, minute, 0, 0);
-  return new Date() < cutoff;
+  if (!year || !month || !day) return false;
+  const vietnamCutoffUtc = Date.UTC(year, month - 1, day, hour - 7, minute || 0, 0);
+  return Date.now() < vietnamCutoffUtc;
 }
 
 function orderKey(employeeCode, mealDate, shift) {
