@@ -222,21 +222,23 @@ async function requestPasswordReset(event) {
 
 async function confirmPasswordReset(event) {
   event.preventDefault();
-  const form = new FormData(event.currentTarget);
+  const resetForm = event.currentTarget;
+  const phone = resetForm.dataset.phone;
+  const form = new FormData(resetForm);
   try {
     await api("/api/password-reset/confirm", {
       method: "POST",
       body: JSON.stringify({
-        phone: event.currentTarget.dataset.phone,
+        phone,
         code: form.get("code"),
         newPassword: form.get("newPassword"),
         confirmPassword: form.get("confirmPassword"),
       }),
     });
-    document.querySelector("#loginForm [name='loginId']").value = event.currentTarget.dataset.phone;
+    document.querySelector("#loginForm [name='loginId']").value = phone;
     document.querySelector("#forgotConfirmForm").classList.add("hidden");
     document.querySelector("#forgotRequestForm").reset();
-    document.querySelector("#forgotConfirmForm").reset();
+    resetForm.reset();
     setMessage("#forgotMessage", "Đã đặt lại mật khẩu. Anh/chị có thể đăng nhập bằng mật khẩu mới.", "success");
   } catch (err) {
     setMessage("#forgotMessage", err.message, "error");
