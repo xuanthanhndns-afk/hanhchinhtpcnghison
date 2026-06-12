@@ -31,12 +31,35 @@ function isoFromDate(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
+function addDaysIso(value, days) {
+  const date = dateFromIso(value);
+  date.setDate(date.getDate() + days);
+  return isoFromDate(date);
+}
+
 function formatDate(value) {
   return dateFromIso(value).toLocaleDateString("vi-VN");
 }
 
 function isPastDate(value) {
   return String(value || "").slice(0, 10) < today;
+}
+
+function isAfterCutoffClient(date = today) {
+  if (date !== today) return false;
+  const [hour, minute] = String(state.settings?.cutoffTime || "08:00").split(":").map(Number);
+  const now = new Date();
+  const cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour || 8, minute || 0, 0, 0);
+  return now >= cutoff;
+}
+
+function isRegistrationClosedDate(value) {
+  const date = String(value || "").slice(0, 10);
+  return isPastDate(date) || isAfterCutoffClient(date);
+}
+
+function registrationMinDate() {
+  return isAfterCutoffClient(today) ? addDaysIso(today, 1) : today;
 }
 
 function isActiveOrderStatus(status) {
@@ -728,6 +751,7 @@ async function renderWorker() {
   state.workerConfirmedRange = null;
   await loadOrders();
   const view = document.querySelector("#view");
+  const minRegisterDate = registrationMinDate();
   view.innerHTML = html`
     <div class="grid">
       <section class="panel span-12">
@@ -741,10 +765,10 @@ async function renderWorker() {
             </select>
           </label>
           <label class="worker-date-field" data-mode-field="day">Ngày ăn
-            <input id="workerDate" type="date" min="${today}" value="${today}" />
+            <input id="workerDate" type="date" min="${minRegisterDate}" value="${minRegisterDate}" />
           </label>
           <label class="worker-date-field hidden" data-mode-field="week">Chọn một ngày trong tuần
-            <input id="workerWeekDate" type="date" min="${today}" value="${today}" />
+            <input id="workerWeekDate" type="date" min="${minRegisterDate}" value="${minRegisterDate}" />
           </label>
           <label class="worker-date-field hidden" data-mode-field="month">Tháng đăng ký
             <input id="workerMonth" type="month" min="${currentMonth}" value="${currentMonth}" />
@@ -803,8 +827,8 @@ function selectedCalendarShiftItems() {
 function workerBaseRangeDates() {
   const mode = document.querySelector("#workerRegisterMode").value;
   if (mode === "day") {
-    const date = document.querySelector("#workerDate").value || today;
-    return isPastDate(date) ? [] : [date];
+    const date = document.querySelector("#workerDate").value || registrationMinDate();
+    return isRegistrationClosedDate(date) ? [] : [date];
   }
   if (mode === "week") {
     const selected = dateFromIso(document.querySelector("#workerWeekDate").value || today);
@@ -912,11 +936,11 @@ function renderWorkerCalendar() {
         ${blanks}
         ${dates
           .map((date) => {
-            const past = isPastDate(date);
-            const disabled = past ? "disabled" : "";
-            return `<div class="calendar-day ${past ? "disabled" : ""}">
+            const closed = isRegistrationClosedDate(date);
+            const disabled = closed ? "disabled" : "";
+            return `<div class="calendar-day ${closed ? "disabled" : ""}">
               <span>${dateFromIso(date).getDate()}</span>
-              <small>${formatDate(date)}${past ? " - Đã qua" : ""}</small>
+              <small>${formatDate(date)}${closed ? " - Đã chốt" : ""}</small>
               <div class="calendar-shifts">
                 <label><input type="checkbox" data-worker-calendar-shift data-date="${date}" value="lunch" ${disabled} /> Trưa</label>
                 <label><input type="checkbox" data-worker-calendar-shift data-date="${date}" value="dinner" ${disabled} /> Tối</label>
@@ -1019,6 +1043,8 @@ function renderWorkerMeals() {
 function renderMealCard(date, shift, disabled) {
   const menu = menuFor(date, shift);
   const order = orderFor(date, shift);
+  const registerDisabled = disabled || isRegistrationClosedDate(date) ? "disabled" : "";
+  const cancelDisabled = isRegistrationClosedDate(date) ? "disabled" : "";
   return html`
     <article class="panel span-6">
       <h3>Ca ${shiftLabel(shift)}</h3>
@@ -1027,19 +1053,11 @@ function renderMealCard(date, shift, disabled) {
       <p class="muted">Đơn giá suất ăn: ${money(menu ? menu.price : state.settings.defaultMealPrice)}</p>
       <p>${statusBadge(order)}</p>
       <div class="actions">
-        <button ${disabled} data-register data-date="${date}" data-shift="${shift}">Đăng ký</button>
-        <button class="danger" data-cancel data-date="${date}" data-shift="${shift}">Hủy</button>
+        <button ${registerDisabled} data-register data-date="${date}" data-shift="${shift}">Đăng ký</button>
+        <button ${cancelDisabled} class="danger" data-cancel data-date="${date}" data-shift="${shift}">Hủy</button>
       </div>
     </article>
   `;
-}
-
-function isAfterCutoffClient(date) {
-  if (date !== today) return false;
-  const [hour, minute] = String(state.settings.cutoffTime || "08:00").split(":").map(Number);
-  const now = new Date();
-  const cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour || 8, minute || 0, 0, 0);
-  return now >= cutoff;
 }
 
 function workerCancelDisableReason(order) {
@@ -1150,6 +1168,10 @@ async function processWorkerRange(action) {
     setMessage("#workerMessage", message, "error");
     return;
   }
+  if (action === "register" && items.some((item) => isRegistrationClosedDate(item.date))) {
+    setMessage("#workerMessage", "Đã quá giờ chốt, không thể đăng ký suất ăn cho ngày hôm nay hoặc ngày đã qua.", "error");
+    return;
+  }
   const actionText = action === "register" ? "đăng ký" : "hủy đăng ký";
   const firstDate = items[0].date;
   const lastDate = items[items.length - 1].date;
@@ -1188,6 +1210,10 @@ async function processWorkerRange(action) {
 async function registerOrder(date, shift, employeeCode = "") {
   try {
     if (state.tab === "worker") {
+      if (isRegistrationClosedDate(date)) {
+        setMessage("#workerMessage", "Đã quá giờ chốt, không thể đăng ký suất ăn cho ngày hôm nay hoặc ngày đã qua.", "error");
+        return;
+      }
       const ok = confirm(`Bạn có chắc chắn đã kiểm tra thông tin đăng ký chưa?\n\nNgày ăn: ${formatDate(date)}\nCa ăn: ${shiftLabel(shift)}`);
       if (!ok) return;
     }
