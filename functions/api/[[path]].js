@@ -496,9 +496,31 @@ function parseMenuItems(raw) {
       const seq = Number(parts[0] || index + 1);
       const name = parts[1] || "";
       const grams = Number(String(parts[2] || "0").replace(/[^\d.-]/g, ""));
-      const unitPrice = Number(String(parts[3] || "0").replace(/[^\d.-]/g, ""));
-      const amount = Number(String(parts[4] || "").replace(/[^\d.-]/g, "")) || grams * unitPrice;
-      return { seq, name, grams, unitPrice, amount };
+      const rawUnit = String(parts[3] || "").toLowerCase();
+      const hasUnitColumn = ["gram", "gam", "g", "piece", "cai", "cái"].includes(rawUnit);
+      const unit = ["piece", "cai", "cái"].includes(rawUnit) ? "piece" : "gram";
+      const unitPriceIndex = hasUnitColumn ? 4 : 3;
+      const unitPrice = Number(String(parts[unitPriceIndex] || "0").replace(/[^\d.-]/g, ""));
+      const amount = Number(String(parts[unitPriceIndex + 1] || "").replace(/[^\d.-]/g, "")) || grams * unitPrice;
+      return { seq, name, grams, unit, unitPrice, amount };
+    })
+    .filter((item) => item.name);
+}
+
+function normalizeMenuItems(items) {
+  return (items || [])
+    .map((item, index) => {
+      const grams = Number(item.grams || item.quantity || 0);
+      const unitPrice = Number(item.unitPrice || 0);
+      const unit = ["piece", "cai", "cái"].includes(String(item.unit || "").toLowerCase()) ? "piece" : "gram";
+      return {
+        seq: Number(item.seq || index + 1),
+        name: String(item.name || "").trim(),
+        grams,
+        unit,
+        unitPrice,
+        amount: Number(item.amount || 0) || grams * unitPrice,
+      };
     })
     .filter((item) => item.name);
 }
@@ -881,7 +903,7 @@ async function handleApi(request, env) {
     const db = await readDb(env);
     const shift = normalizeShift(body.shift);
     const mealDate = String(body.mealDate || "").slice(0, 10);
-    const items = Array.isArray(body.items) ? body.items : parseMenuItems(body.itemsText || body.dishes);
+    const items = normalizeMenuItems(Array.isArray(body.items) ? body.items : parseMenuItems(body.itemsText || body.dishes));
     const totalMenuValue = menuTotal(items);
     const price = totalMenuValue || Number(body.price || db.settings.defaultMealPrice);
     const chefIds = Array.isArray(body.chefIds) ? body.chefIds.map(String) : [];

@@ -491,7 +491,7 @@ label {
 }
 
 .input-table table {
-  min-width: 980px;
+  min-width: 1120px;
   table-layout: fixed;
 }
 
@@ -516,10 +516,16 @@ label {
 
 .input-table th:nth-child(6),
 .input-table td:nth-child(6) {
+  width: 170px;
+}
+
+.input-table th:nth-child(7),
+.input-table td:nth-child(7) {
   width: 100px;
 }
 
-.input-table input {
+.input-table input,
+.input-table select {
   min-width: 0;
   width: 100%;
   padding: 7px 8px;

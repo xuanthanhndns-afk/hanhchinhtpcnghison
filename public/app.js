@@ -373,17 +373,29 @@ function menuItemsTotal(items) {
   return (items || []).reduce((sum, item) => sum + menuItemAmount(item), 0);
 }
 
+function menuItemUnit(item) {
+  return item && item.unit === "piece" ? "piece" : "gram";
+}
+
+function menuUnitLabel(unit) {
+  return unit === "piece" ? "cái" : "gram";
+}
+
+function menuQuantityText(item) {
+  return `${Number(item.grams || 0).toLocaleString("vi-VN")} ${menuUnitLabel(menuItemUnit(item))}`;
+}
+
 function renderMenuItemsTable(items, compact = false) {
   const rows = items || [];
   if (!rows.length) return `<p class="muted">Chưa có định lượng món ăn.</p>`;
   return html`
     <div class="table-wrap menu-detail">
       <table>
-        <thead><tr><th>STT</th><th>Tên món</th><th>Định lượng (gam)</th><th>Đơn giá</th><th>Thành tiền</th></tr></thead>
+        <thead><tr><th>STT</th><th>Tên món</th><th>Định lượng</th><th>Đơn giá</th><th>Thành tiền</th></tr></thead>
         <tbody>
           ${rows
             .map(
-              (item) => `<tr><td>${item.seq}</td><td>${item.name}</td><td>${item.grams}</td><td>${money(item.unitPrice)}</td><td>${money(menuItemAmount(item))}</td></tr>`
+              (item) => `<tr><td>${item.seq}</td><td>${item.name}</td><td>${menuQuantityText(item)}</td><td>${money(item.unitPrice)}</td><td>${money(menuItemAmount(item))}</td></tr>`
             )
             .join("")}
         </tbody>
@@ -401,10 +413,10 @@ function chefNames(menu) {
 
 function defaultMenuRows() {
   return [
-    { seq: 1, name: "Cơm", grams: 250, unitPrice: 20 },
-    { seq: 2, name: "Món mặn", grams: 100, unitPrice: 120 },
-    { seq: 3, name: "Rau", grams: 100, unitPrice: 30 },
-    { seq: 4, name: "Canh", grams: 150, unitPrice: 10 },
+    { seq: 1, name: "Cơm", grams: 250, unit: "gram", unitPrice: 20 },
+    { seq: 2, name: "Món mặn", grams: 100, unit: "gram", unitPrice: 120 },
+    { seq: 3, name: "Rau", grams: 100, unit: "gram", unitPrice: 30 },
+    { seq: 4, name: "Canh", grams: 150, unit: "gram", unitPrice: 10 },
   ];
 }
 
@@ -416,12 +428,21 @@ function addMenuInputRow(item = {}) {
     <td><input class="menu-seq" type="number" value="${seq}" min="1" /></td>
     <td><input class="menu-name" value="${item.name || ""}" placeholder="Tên món" /></td>
     <td><input class="menu-grams" type="number" value="${item.grams || 0}" min="0" /></td>
+    <td>
+      <select class="menu-unit">
+        <option value="gram" ${menuItemUnit(item) === "gram" ? "selected" : ""}>gram</option>
+        <option value="piece" ${menuItemUnit(item) === "piece" ? "selected" : ""}>cái</option>
+      </select>
+    </td>
     <td><input class="menu-unit-price" type="number" value="${item.unitPrice || 0}" min="0" /></td>
     <td><input class="menu-amount" type="number" value="${menuItemAmount(item)}" min="0" readonly /></td>
     <td><button type="button" class="danger menu-remove">Xóa</button></td>
   `;
   tbody.appendChild(tr);
-  tr.querySelectorAll("input").forEach((input) => input.addEventListener("input", updateMenuInputTotals));
+  tr.querySelectorAll("input, select").forEach((input) => {
+    input.addEventListener("input", updateMenuInputTotals);
+    input.addEventListener("change", updateMenuInputTotals);
+  });
   tr.querySelector(".menu-remove").addEventListener("click", () => {
     tr.remove();
     renumberMenuRows();
@@ -446,6 +467,7 @@ function collectMenuInputRows() {
         seq: Number(tr.querySelector(".menu-seq").value || 0),
         name: tr.querySelector(".menu-name").value.trim(),
         grams,
+        unit: tr.querySelector(".menu-unit").value,
         unitPrice,
         amount,
       };
@@ -1264,7 +1286,7 @@ async function exportWorkerDay() {
     const order = (data.orders || []).find((item) => item.mealDate === date && item.shift === shift);
     const itemText =
       menu && Array.isArray(menu.items)
-        ? menu.items.map((item) => `${item.seq}. ${item.name} - ${item.grams}g - ${money(item.amount)}`).join("; ")
+        ? menu.items.map((item) => `${item.seq}. ${item.name} - ${menuQuantityText(item)} - ${money(item.amount)}`).join("; ")
         : "Nhà bếp chưa nhập thực đơn";
     return [
       date,
@@ -1321,7 +1343,7 @@ function renderKitchen() {
             <label>Danh sách món ăn theo định lượng</label>
             <div class="table-wrap input-table">
               <table>
-                <thead><tr><th>STT</th><th>Tên món</th><th>Định lượng (gam)</th><th>Đơn giá/gam</th><th>Thành tiền</th><th></th></tr></thead>
+                <thead><tr><th>STT</th><th>Tên món</th><th>Định lượng</th><th>Đơn vị</th><th>Đơn giá/đơn vị</th><th>Thành tiền</th><th></th></tr></thead>
                 <tbody id="menuItemsBody"></tbody>
               </table>
             </div>
@@ -1534,10 +1556,10 @@ function renderReportContent(data) {
     <h3>Định lượng thực đơn</h3>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Ngày</th><th>Ca</th><th>STT</th><th>Tên món</th><th>Định lượng (gam)</th><th>Đơn giá</th><th>Thành tiền</th></tr></thead>
+        <thead><tr><th>Ngày</th><th>Ca</th><th>STT</th><th>Tên món</th><th>Định lượng</th><th>Đơn giá</th><th>Thành tiền</th></tr></thead>
         <tbody>
           ${menuRows
-            .map((item) => `<tr><td>${formatDate(item.mealDate)}</td><td>${item.shiftLabel}</td><td>${item.seq}</td><td>${item.name}</td><td>${item.grams}</td><td><span class="money-red">${money(item.unitPrice)}</span></td><td><span class="money-red">${money(item.amount)}</span></td></tr>`)
+            .map((item) => `<tr><td>${formatDate(item.mealDate)}</td><td>${item.shiftLabel}</td><td>${item.seq}</td><td>${item.name}</td><td>${menuQuantityText(item)}</td><td><span class="money-red">${money(item.unitPrice)}</span></td><td><span class="money-red">${money(item.amount)}</span></td></tr>`)
             .join("")}
         </tbody>
       </table>
@@ -1561,7 +1583,7 @@ async function exportDailyReport() {
   const data = state.dailyReport;
   const menuRows = data.daily.flatMap((day) =>
     day.summary.flatMap((summary) =>
-      (summary.menuItems || []).map((item) => [day.mealDate, summary.shiftLabel, item.seq, item.name, item.grams, item.unitPrice, item.amount])
+      (summary.menuItems || []).map((item) => [day.mealDate, summary.shiftLabel, item.seq, item.name, menuQuantityText(item), item.unitPrice, item.amount])
     )
   );
   const detailRows = data.orders.map((o) => [o.mealDate, o.phone || o.employeeCode, o.fullName, o.department, shiftLabel(o.shift), o.price, o.status, o.source]);
@@ -1582,7 +1604,7 @@ async function exportDailyReport() {
     },
     {
       title: "Định lượng thực đơn",
-      headers: ["Ngày", "Ca", "STT", "Tên món", "Định lượng (gam)", "Đơn giá", "Thành tiền"],
+      headers: ["Ngày", "Ca", "STT", "Tên món", "Định lượng", "Đơn giá", "Thành tiền"],
       rows: menuRows,
     },
     {
