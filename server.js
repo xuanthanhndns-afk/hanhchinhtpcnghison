@@ -531,9 +531,9 @@ async function api(req, res) {
       const db = readDb();
       const user = findUserByLogin(db, body.loginId || body.employeeCode || body.phone);
       if (!user || user.password !== body.password) {
-        return json(res, 401, { error: "Sai tai khoan hoac mat khau" });
+        return json(res, 401, { error: "Sai tài khoản hoặc mật khẩu" });
       }
-      if (!user || user.status !== "active") return json(res, 401, { error: "Sai tai khoan hoac mat khau" });
+      if (!user || user.status !== "active") return json(res, 401, { error: "Sai tài khoản hoặc mật khẩu" });
       const sid = crypto.randomUUID();
       sessions.set(sid, { userId: user.id, createdAt: Date.now() });
       res.setHeader("set-cookie", `sid=${encodeURIComponent(sid)}; HttpOnly; SameSite=Lax; Path=/`);

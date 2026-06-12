@@ -153,9 +153,7 @@ function renderLogin() {
         <label>Số điện thoại / tài khoản
           <input name="loginId" value="0901000001" autocomplete="username" />
         </label>
-        <label>Mật khẩu
-          <input name="password" type="password" value="123456" autocomplete="current-password" />
-        </label>
+        ${passwordField("Mật khẩu", "password", "current-password")}
         <button>Đăng nhập</button>
         <div id="loginMessage"></div>
       </form>

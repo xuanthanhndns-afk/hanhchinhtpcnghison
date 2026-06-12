@@ -505,7 +505,7 @@ async function handleApi(request, env) {
     const db = await readDb(env);
     const user = findUserByLogin(db, body.loginId || body.employeeCode || body.phone);
     if (!user || user.password !== body.password || user.status !== "active") {
-      throw new ApiError(401, "Sai tai khoan hoac mat khau");
+      throw new ApiError(401, "Sai tài khoản hoặc mật khẩu");
     }
     const sid = await createSession(env, user.id);
     return json(
