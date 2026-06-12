@@ -18,6 +18,19 @@ const state = {
 const today = new Date().toISOString().slice(0, 10);
 const currentMonth = new Date().toISOString().slice(0, 7);
 
+function dateFromIso(value) {
+  const [year, month, day] = String(value || today).slice(0, 10).split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function isoFromDate(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function formatDate(value) {
+  return dateFromIso(value).toLocaleDateString("vi-VN");
+}
+
 function money(value) {
   return Number(value || 0).toLocaleString("vi-VN") + " đ";
 }
@@ -702,30 +715,115 @@ async function renderWorker() {
   view.innerHTML = html`
     <div class="grid">
       <section class="panel span-12">
-        <h2>Đăng ký cơm</h2>
-        <div class="row">
-          <label>Ngay an
+        <h2>Đăng ký suất ăn</h2>
+        <div class="form-grid worker-range-form">
+          <label>Hình thức đăng ký
+            <select id="workerRegisterMode">
+              <option value="day">Đăng ký theo ngày</option>
+              <option value="week">Đăng ký theo tuần</option>
+              <option value="month">Đăng ký theo tháng</option>
+            </select>
+          </label>
+          <label class="worker-date-field" data-mode-field="day">Ngày ăn
             <input id="workerDate" type="date" value="${today}" />
           </label>
-          <button id="reloadWorker" class="secondary">Xem ngày</button>
+          <label class="worker-date-field hidden" data-mode-field="week">Chọn một ngày trong tuần
+            <input id="workerWeekDate" type="date" value="${today}" />
+          </label>
+          <label class="worker-date-field hidden" data-mode-field="month">Tháng đăng ký
+            <input id="workerMonth" type="month" value="${currentMonth}" />
+          </label>
+          <fieldset class="shift-picker">
+            <legend>Ca ăn</legend>
+            <label><input type="checkbox" name="workerShift" value="lunch" checked /> Trưa</label>
+            <label><input type="checkbox" name="workerShift" value="dinner" /> Tối</label>
+          </fieldset>
+        </div>
+        <div class="actions">
+          <button id="registerWorkerRange">Đăng ký các suất đã chọn</button>
+          <button id="cancelWorkerRange" class="danger">Hủy các suất đã chọn</button>
+          <button id="reloadWorker" class="secondary">Xem thông tin</button>
           <button id="exportWorkerDay" class="secondary">Xuất Excel theo ngày</button>
         </div>
+        <div id="workerRangePreview"></div>
         <div id="workerMeals"></div>
       </section>
     </div>
   `;
+  document.querySelector("#workerRegisterMode").addEventListener("change", updateWorkerRangeView);
+  document.querySelector("#workerDate").addEventListener("change", updateWorkerRangeView);
+  document.querySelector("#workerWeekDate").addEventListener("change", updateWorkerRangeView);
+  document.querySelector("#workerMonth").addEventListener("change", updateWorkerRangeView);
+  document.querySelectorAll("[name='workerShift']").forEach((input) => input.addEventListener("change", updateWorkerRangeView));
+  document.querySelector("#registerWorkerRange").addEventListener("click", () => processWorkerRange("register"));
+  document.querySelector("#cancelWorkerRange").addEventListener("click", () => processWorkerRange("cancel"));
   document.querySelector("#reloadWorker").addEventListener("click", renderWorkerMeals);
   document.querySelector("#exportWorkerDay").addEventListener("click", exportWorkerDay);
-  document.querySelector("#workerDate").addEventListener("change", renderWorkerMeals);
+  updateWorkerRangeView();
+}
+
+function selectedWorkerShifts() {
+  return Array.from(document.querySelectorAll("[name='workerShift']:checked")).map((input) => input.value);
+}
+
+function workerRangeDates() {
+  const mode = document.querySelector("#workerRegisterMode").value;
+  if (mode === "day") return [document.querySelector("#workerDate").value || today];
+  if (mode === "week") {
+    const selected = dateFromIso(document.querySelector("#workerWeekDate").value || today);
+    const day = selected.getDay() || 7;
+    selected.setDate(selected.getDate() - day + 1);
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(selected);
+      date.setDate(selected.getDate() + index);
+      return isoFromDate(date);
+    });
+  }
+  const month = document.querySelector("#workerMonth").value || currentMonth;
+  const [year, mm] = month.split("-").map(Number);
+  const end = new Date(year, mm, 0).getDate();
+  return Array.from({ length: end }, (_, index) => `${month}-${String(index + 1).padStart(2, "0")}`);
+}
+
+function workerRangeItems() {
+  const shifts = selectedWorkerShifts();
+  return workerRangeDates().flatMap((date) => shifts.map((shift) => ({ date, shift })));
+}
+
+function updateWorkerRangeView() {
+  const mode = document.querySelector("#workerRegisterMode").value;
+  document.querySelectorAll("[data-mode-field]").forEach((field) => {
+    field.classList.toggle("hidden", field.dataset.modeField !== mode);
+  });
+  renderWorkerRangePreview();
   renderWorkerMeals();
 }
 
+function renderWorkerRangePreview() {
+  const preview = document.querySelector("#workerRangePreview");
+  const items = workerRangeItems();
+  if (!items.length) {
+    preview.innerHTML = `<div class="notice bad-notice">Vui lòng chọn ít nhất một ca ăn.</div>`;
+    return;
+  }
+  const firstDate = items[0].date;
+  const lastDate = items[items.length - 1].date;
+  const shifts = selectedWorkerShifts().map(shiftLabel).join(", ");
+  preview.innerHTML = html`
+    <div class="notice">
+      Đã chọn ${items.length} suất ăn, từ ${formatDate(firstDate)} đến ${formatDate(lastDate)}, ca: ${shifts}.
+    </div>
+  `;
+}
+
 function renderWorkerMeals() {
-  const date = document.querySelector("#workerDate").value;
+  const dates = workerRangeDates();
+  const date = dates[0] || today;
   const container = document.querySelector("#workerMeals");
   const disabled = state.user.registrationLockedNow ? "disabled" : "";
   container.innerHTML = html`
     ${state.user.registrationLockedNow ? `<div class="notice bad-notice">Không thể đăng ký cơm cho đến khi thanh toán thành công.</div>` : ""}
+    <h3>Thông tin suất ăn ngày ${formatDate(date)}</h3>
     <div class="grid">
       ${["lunch", "dinner"].map((shift) => renderMealCard(date, shift, disabled)).join("")}
     </div>
@@ -757,8 +855,51 @@ function renderMealCard(date, shift, disabled) {
   `;
 }
 
+async function processWorkerRange(action) {
+  const items = workerRangeItems();
+  if (!items.length) {
+    setMessage("#workerMessage", "Vui lòng chọn ít nhất một ca ăn.", "error");
+    return;
+  }
+  const actionText = action === "register" ? "đăng ký" : "hủy đăng ký";
+  const firstDate = items[0].date;
+  const lastDate = items[items.length - 1].date;
+  const shifts = selectedWorkerShifts().map(shiftLabel).join(", ");
+  const message =
+    action === "register"
+      ? `Bạn có chắc chắn đã kiểm tra thông tin đăng ký chưa?\n\nThao tác: Đăng ký ${items.length} suất\nTừ ngày: ${formatDate(firstDate)}\nĐến ngày: ${formatDate(lastDate)}\nCa ăn: ${shifts}`
+      : `Bạn có chắc chắn muốn hủy các suất đã chọn?\n\nThao tác: Hủy ${items.length} suất\nTừ ngày: ${formatDate(firstDate)}\nĐến ngày: ${formatDate(lastDate)}\nCa ăn: ${shifts}`;
+  if (!confirm(message)) return;
+
+  let success = 0;
+  const errors = [];
+  for (const item of items) {
+    try {
+      await api(action === "register" ? "/api/orders/register" : "/api/orders/cancel", {
+        method: "POST",
+        body: JSON.stringify({ mealDate: item.date, shift: item.shift }),
+      });
+      success += 1;
+    } catch (err) {
+      errors.push(`${formatDate(item.date)} ca ${shiftLabel(item.shift)}: ${err.message}`);
+    }
+  }
+
+  await loadBootstrap();
+  await loadOrders();
+  await renderWorker();
+  const result = errors.length
+    ? `Đã ${actionText} thành công ${success}/${items.length} suất. Chưa xử lý được: ${errors.join("; ")}`
+    : `Đã ${actionText} thành công ${success}/${items.length} suất.`;
+  setMessage("#workerMessage", result, errors.length ? "error" : "success");
+}
+
 async function registerOrder(date, shift, employeeCode = "") {
   try {
+    if (state.tab === "worker") {
+      const ok = confirm(`Bạn có chắc chắn đã kiểm tra thông tin đăng ký chưa?\n\nNgày ăn: ${formatDate(date)}\nCa ăn: ${shiftLabel(shift)}`);
+      if (!ok) return;
+    }
     await api("/api/orders/register", {
       method: "POST",
       body: JSON.stringify({ mealDate: date, shift, employeeCode }),
@@ -774,6 +915,10 @@ async function registerOrder(date, shift, employeeCode = "") {
 
 async function cancelOrder(date, shift, employeeCode = "") {
   try {
+    if (state.tab === "worker") {
+      const ok = confirm(`Bạn có chắc chắn muốn hủy đăng ký suất ăn này?\n\nNgày ăn: ${formatDate(date)}\nCa ăn: ${shiftLabel(shift)}`);
+      if (!ok) return;
+    }
     await api("/api/orders/cancel", {
       method: "POST",
       body: JSON.stringify({ mealDate: date, shift, employeeCode }),

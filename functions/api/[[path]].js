@@ -841,8 +841,8 @@ async function handleApi(request, env) {
     const mealDate = String(body.mealDate || "").slice(0, 10);
     const shift = normalizeShift(body.shift);
     const beforeCutoff = isBeforeCutoff(mealDate, db.settings.cutoffTime);
-    if (!beforeCutoff && user.role === "worker") throw new ApiError(400, "Da qua 08h, cong nhan khong duoc tu dang ky");
-    if (!beforeCutoff && user.role !== "kitchen" && user.role !== "admin") throw new ApiError(400, "Sau gio chot chi nha bep/admin duoc bo sung");
+    if (!beforeCutoff && user.role === "worker") throw new ApiError(400, "Đã quá 08h, người dùng không được tự đăng ký suất ăn trong ngày này");
+    if (!beforeCutoff && user.role !== "kitchen" && user.role !== "admin") throw new ApiError(400, "Sau giờ chốt chỉ nhà bếp hoặc admin được bổ sung suất ăn");
     const menu = getMenu(db, mealDate, shift);
     const key = orderKey(employeeCode, mealDate, shift);
     let order = db.orders.find((o) => orderKey(o.employeeCode, o.mealDate, o.shift) === key);
@@ -882,7 +882,7 @@ async function handleApi(request, env) {
     const order = db.orders.find((o) => o.employeeCode === employeeCode && o.mealDate === mealDate && o.shift === shift);
     if (!order) throw new ApiError(404, "Khong tim thay dang ky");
     const beforeCutoff = isBeforeCutoff(mealDate, db.settings.cutoffTime);
-    if (user.role === "worker" && !beforeCutoff) throw new ApiError(400, "Da qua 08h, khong duoc tu huy");
+    if (user.role === "worker" && !beforeCutoff) throw new ApiError(400, "Đã quá 08h, không được tự hủy đăng ký suất ăn trong ngày này");
     order.status = beforeCutoff ? "cancelled_before_cutoff" : "cancelled_by_admin";
     order.cancelledAt = nowIso();
     order.operatedBy = user.employeeCode;

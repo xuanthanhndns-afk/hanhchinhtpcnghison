@@ -238,6 +238,29 @@ label {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.worker-range-form {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 12px;
+}
+
+.shift-picker {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.shift-picker legend {
+  padding: 0 6px;
+  color: var(--muted);
+}
+
+.shift-picker label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 18px;
+}
+
 .copyright {
   margin-top: 18px;
   text-align: center;
@@ -561,7 +584,8 @@ tr:last-child td {
   }
 
   .two-cols,
-  .three-cols {
+  .three-cols,
+  .worker-range-form {
     grid-template-columns: 1fr;
   }
 

@@ -890,10 +890,10 @@ async function api(req, res) {
       const shift = normalizeShift(body.shift);
       const beforeCutoff = isBeforeCutoff(mealDate, db.settings.cutoffTime);
       if (!beforeCutoff && user.role === "worker") {
-        return json(res, 400, { error: "Da qua 08h, cong nhan khong duoc tu dang ky" });
+        return json(res, 400, { error: "Đã quá 08h, người dùng không được tự đăng ký suất ăn trong ngày này" });
       }
       if (!beforeCutoff && user.role !== "kitchen" && user.role !== "admin") {
-        return json(res, 400, { error: "Sau gio chot chi nha bep/admin duoc bo sung" });
+        return json(res, 400, { error: "Sau giờ chốt chỉ nhà bếp hoặc admin được bổ sung suất ăn" });
       }
       const menu = getMenu(db, mealDate, shift);
       const key = orderKey(employeeCode, mealDate, shift);
@@ -939,7 +939,7 @@ async function api(req, res) {
       );
       if (!order) return json(res, 404, { error: "Khong tim thay dang ky" });
       const beforeCutoff = isBeforeCutoff(mealDate, db.settings.cutoffTime);
-      if (user.role === "worker" && !beforeCutoff) return json(res, 400, { error: "Da qua 08h, khong duoc tu huy" });
+      if (user.role === "worker" && !beforeCutoff) return json(res, 400, { error: "Đã quá 08h, không được tự hủy đăng ký suất ăn trong ngày này" });
       order.status = beforeCutoff ? "cancelled_before_cutoff" : "cancelled_by_admin";
       order.cancelledAt = nowIso();
       order.operatedBy = user.employeeCode;
