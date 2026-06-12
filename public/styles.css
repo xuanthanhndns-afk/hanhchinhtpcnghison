@@ -336,6 +336,35 @@ label {
   cursor: not-allowed;
 }
 
+.worker-cancel-panel {
+  margin-top: 16px;
+}
+
+.cancel-order-list {
+  display: grid;
+  gap: 8px;
+}
+
+.cancel-order-item {
+  display: grid;
+  grid-template-columns: 28px 1fr 120px 150px;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: #fff;
+}
+
+.cancel-order-item.disabled {
+  color: #94a3b8;
+  background: #f1f5f9;
+}
+
+.cancel-order-item small {
+  color: var(--muted);
+}
+
 .copyright {
   margin-top: 18px;
   text-align: center;

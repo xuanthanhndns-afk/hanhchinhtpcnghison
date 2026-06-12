@@ -13,6 +13,7 @@ const state = {
   kitchenTab: "menu",
   dailyReport: null,
   monthlyReport: null,
+  workerConfirmedRange: null,
 };
 
 const today = (() => {
@@ -36,6 +37,10 @@ function formatDate(value) {
 
 function isPastDate(value) {
   return String(value || "").slice(0, 10) < today;
+}
+
+function isActiveOrderStatus(status) {
+  return ["registered", "locked", "added_after_cutoff"].includes(status);
 }
 
 function money(value) {
@@ -717,6 +722,7 @@ async function deleteChef(id) {
 }
 
 async function renderWorker() {
+  state.workerConfirmedRange = null;
   await loadOrders();
   const view = document.querySelector("#view");
   view.innerHTML = html`
@@ -748,13 +754,22 @@ async function renderWorker() {
         </div>
         <div class="actions">
           <button id="registerWorkerRange">Đăng ký các suất đã chọn</button>
-          <button id="cancelWorkerRange" class="danger">Hủy các suất đã chọn</button>
+          <button id="cancelWorkerRange" class="danger">Mở danh sách hủy</button>
           <button id="reloadWorker" class="secondary">Xem thông tin</button>
           <button id="exportWorkerDay" class="secondary">Xuất Excel theo ngày</button>
         </div>
         <div id="workerCalendar"></div>
         <div id="workerRangePreview"></div>
         <div id="workerMeals"></div>
+        <section class="panel span-12 worker-cancel-panel" id="workerCancelPanel">
+          <h2>Hủy đăng ký suất ăn</h2>
+          <p class="muted">Chỉ hiển thị các lượt đã đăng ký trong tháng. Ngày đã qua hoặc đã quá giờ chốt sẽ bị khóa, không thể chọn để hủy.</p>
+          <label>Tháng cần hủy
+            <input id="workerCancelMonth" type="month" min="${currentMonth}" value="${currentMonth}" />
+          </label>
+          <div id="workerCancelList"></div>
+          <div id="workerCancelMessage"></div>
+        </section>
       </section>
     </div>
   `;
@@ -764,10 +779,14 @@ async function renderWorker() {
   document.querySelector("#workerMonth").addEventListener("change", updateWorkerRangeView);
   document.querySelectorAll("[name='workerShift']").forEach((input) => input.addEventListener("change", updateWorkerRangeView));
   document.querySelector("#registerWorkerRange").addEventListener("click", () => processWorkerRange("register"));
-  document.querySelector("#cancelWorkerRange").addEventListener("click", () => processWorkerRange("cancel"));
+  document.querySelector("#cancelWorkerRange").addEventListener("click", () => {
+    document.querySelector("#workerCancelPanel").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
   document.querySelector("#reloadWorker").addEventListener("click", renderWorkerMeals);
   document.querySelector("#exportWorkerDay").addEventListener("click", exportWorkerDay);
+  document.querySelector("#workerCancelMonth").addEventListener("change", renderWorkerCancelPanel);
   updateWorkerRangeView();
+  renderWorkerCancelPanel();
 }
 
 function selectedWorkerShifts() {
@@ -807,7 +826,42 @@ function workerRangeItems() {
   return workerRangeDates().flatMap((date) => shifts.map((shift) => ({ date, shift })));
 }
 
+function workerRangeKey() {
+  const mode = document.querySelector("#workerRegisterMode").value;
+  const dateKey =
+    mode === "day"
+      ? document.querySelector("#workerDate").value
+      : mode === "week"
+        ? document.querySelector("#workerWeekDate").value
+        : document.querySelector("#workerMonth").value;
+  return `${mode}|${dateKey}|${selectedWorkerShifts().sort().join(",")}|${workerRangeDates().join(",")}`;
+}
+
+function workerActionItems() {
+  const mode = document.querySelector("#workerRegisterMode").value;
+  if (mode === "day") return workerRangeItems();
+  const key = workerRangeKey();
+  if (state.workerConfirmedRange?.key === key) return state.workerConfirmedRange.items;
+  return [];
+}
+
+function invalidateWorkerConfirmedRange() {
+  state.workerConfirmedRange = null;
+}
+
+function confirmWorkerRangeSelection() {
+  const items = workerRangeItems();
+  if (!items.length) {
+    setMessage("#workerMessage", "Vui lòng chọn ít nhất một ngày và ít nhất một ca ăn.", "error");
+    return;
+  }
+  state.workerConfirmedRange = { key: workerRangeKey(), items };
+  renderWorkerRangePreview();
+  setMessage("#workerMessage", `Đã xác nhận chọn ${items.length} suất ăn. Anh/chị có thể bấm đăng ký để hoàn tất.`, "success");
+}
+
 function updateWorkerRangeView() {
+  invalidateWorkerConfirmedRange();
   const mode = document.querySelector("#workerRegisterMode").value;
   document.querySelectorAll("[data-mode-field]").forEach((field) => {
     field.classList.toggle("hidden", field.dataset.modeField !== mode);
@@ -834,6 +888,7 @@ function renderWorkerCalendar() {
       <div class="calendar-head">
         <strong>${monthMode ? `Lịch tháng ${document.querySelector("#workerMonth").value || currentMonth}` : `Lịch tuần ${formatDate(dates[0])} - ${formatDate(dates[dates.length - 1])}`}</strong>
         <div class="actions">
+          <button type="button" id="confirmWorkerDates">Xác nhận chọn</button>
           <button type="button" class="secondary" id="selectAllWorkerDates">Chọn tất cả</button>
           <button type="button" class="secondary" id="clearWorkerDates">Bỏ chọn</button>
         </div>
@@ -858,12 +913,15 @@ function renderWorkerCalendar() {
   `;
   calendar.querySelectorAll("[data-worker-calendar-date]").forEach((input) => {
     input.addEventListener("change", () => {
+      invalidateWorkerConfirmedRange();
       input.closest(".calendar-day").classList.toggle("selected", input.checked);
       renderWorkerRangePreview();
       renderWorkerMeals();
     });
   });
+  calendar.querySelector("#confirmWorkerDates").addEventListener("click", confirmWorkerRangeSelection);
   calendar.querySelector("#selectAllWorkerDates").addEventListener("click", () => {
+    invalidateWorkerConfirmedRange();
     calendar.querySelectorAll("[data-worker-calendar-date]").forEach((input) => {
       if (input.disabled) return;
       input.checked = true;
@@ -873,6 +931,7 @@ function renderWorkerCalendar() {
     renderWorkerMeals();
   });
   calendar.querySelector("#clearWorkerDates").addEventListener("click", () => {
+    invalidateWorkerConfirmedRange();
     calendar.querySelectorAll("[data-worker-calendar-date]").forEach((input) => {
       input.checked = false;
       input.closest(".calendar-day").classList.remove("selected");
@@ -889,20 +948,30 @@ function renderWorkerRangePreview() {
     preview.innerHTML = `<div class="notice bad-notice">Vui lòng chọn ít nhất một ngày và ít nhất một ca ăn.</div>`;
     return;
   }
+  const mode = document.querySelector("#workerRegisterMode").value;
+  const confirmed = mode === "day" || state.workerConfirmedRange?.key === workerRangeKey();
   const firstDate = items[0].date;
   const lastDate = items[items.length - 1].date;
   const shifts = selectedWorkerShifts().map(shiftLabel).join(", ");
   preview.innerHTML = html`
-    <div class="notice">
-      Đang chọn ${items.length} suất ăn để thao tác, từ ${formatDate(firstDate)} đến ${formatDate(lastDate)}, ca: ${shifts}.
+    <div class="notice ${confirmed ? "" : "bad-notice"}">
+      ${confirmed ? "Đã xác nhận" : "Đang chọn"} ${items.length} suất ăn, từ ${formatDate(firstDate)} đến ${formatDate(lastDate)}, ca: ${shifts}.${confirmed ? "" : " Vui lòng bấm Xác nhận chọn trước khi đăng ký."}
     </div>
   `;
 }
 
 function renderWorkerMeals() {
+  const mode = document.querySelector("#workerRegisterMode").value;
+  const container = document.querySelector("#workerMeals");
+  if (mode !== "day") {
+    container.innerHTML = html`
+      ${state.user.registrationLockedNow ? `<div class="notice bad-notice">Không thể đăng ký cơm cho đến khi thanh toán thành công.</div>` : ""}
+      <div id="workerMessage"></div>
+    `;
+    return;
+  }
   const dates = workerRangeDates();
   const date = dates[0];
-  const container = document.querySelector("#workerMeals");
   const disabled = state.user.registrationLockedNow ? "disabled" : "";
   if (!date || !selectedWorkerShifts().length) {
     container.innerHTML = html`
@@ -946,10 +1015,120 @@ function renderMealCard(date, shift, disabled) {
   `;
 }
 
+function isAfterCutoffClient(date) {
+  if (date !== today) return false;
+  const [hour, minute] = String(state.settings.cutoffTime || "08:00").split(":").map(Number);
+  const now = new Date();
+  const cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour || 8, minute || 0, 0, 0);
+  return now >= cutoff;
+}
+
+function workerCancelDisableReason(order) {
+  if (isPastDate(order.mealDate)) return "Đã qua";
+  if (isAfterCutoffClient(order.mealDate)) return "Đã quá giờ chốt";
+  return "";
+}
+
+function workerCancellableOrders(month) {
+  return state.orders
+    .filter((order) => order.employeeCode === state.user.employeeCode)
+    .filter((order) => order.mealDate.startsWith(month))
+    .filter((order) => isActiveOrderStatus(order.status))
+    .sort((a, b) => `${a.mealDate}-${a.shift}`.localeCompare(`${b.mealDate}-${b.shift}`));
+}
+
+function renderWorkerCancelPanel() {
+  const list = document.querySelector("#workerCancelList");
+  if (!list) return;
+  const month = document.querySelector("#workerCancelMonth")?.value || currentMonth;
+  const orders = workerCancellableOrders(month);
+  if (!orders.length) {
+    list.innerHTML = `<div class="notice">Không có lượt đăng ký còn hiệu lực trong tháng này.</div>`;
+    return;
+  }
+  list.innerHTML = html`
+    <div class="calendar-panel">
+      <div class="calendar-head">
+        <strong>Danh sách suất đã đăng ký trong tháng ${month}</strong>
+        <div class="actions">
+          <button type="button" class="secondary" id="selectAllCancelOrders">Chọn tất cả có thể hủy</button>
+          <button type="button" class="secondary" id="clearCancelOrders">Bỏ chọn</button>
+        </div>
+      </div>
+      <div class="cancel-order-list">
+        ${orders
+          .map((order) => {
+            const reason = workerCancelDisableReason(order);
+            const disabled = reason ? "disabled" : "";
+            return `<label class="cancel-order-item ${reason ? "disabled" : ""}">
+              <input type="checkbox" data-worker-cancel-order data-date="${order.mealDate}" data-shift="${order.shift}" ${disabled} />
+              <span><strong>${formatDate(order.mealDate)} - Ca ${shiftLabel(order.shift)}</strong></span>
+              <span>${money(order.price)}</span>
+              <small>${reason || "Có thể hủy"}</small>
+            </label>`;
+          })
+          .join("")}
+      </div>
+      <div class="actions">
+        <button type="button" class="danger" id="confirmCancelOrders">Hủy các suất đã tích chọn</button>
+      </div>
+    </div>
+  `;
+  list.querySelector("#selectAllCancelOrders").addEventListener("click", () => {
+    list.querySelectorAll("[data-worker-cancel-order]").forEach((input) => {
+      if (!input.disabled) input.checked = true;
+    });
+  });
+  list.querySelector("#clearCancelOrders").addEventListener("click", () => {
+    list.querySelectorAll("[data-worker-cancel-order]").forEach((input) => {
+      input.checked = false;
+    });
+  });
+  list.querySelector("#confirmCancelOrders").addEventListener("click", cancelSelectedWorkerOrders);
+}
+
+async function cancelSelectedWorkerOrders() {
+  const selected = Array.from(document.querySelectorAll("[data-worker-cancel-order]:checked")).map((input) => ({
+    date: input.dataset.date,
+    shift: input.dataset.shift,
+  }));
+  if (!selected.length) {
+    setMessage("#workerCancelMessage", "Vui lòng tích chọn ít nhất một suất cần hủy.", "error");
+    return;
+  }
+  if (!confirm(`Bạn đã lựa chọn hủy số lượng ${selected.length}. Bạn vui lòng xác nhận lại.`)) return;
+  let success = 0;
+  const errors = [];
+  for (const item of selected) {
+    try {
+      await api("/api/orders/cancel", {
+        method: "POST",
+        body: JSON.stringify({ mealDate: item.date, shift: item.shift }),
+      });
+      success += 1;
+    } catch (err) {
+      errors.push(`${formatDate(item.date)} ca ${shiftLabel(item.shift)}: ${err.message}`);
+    }
+  }
+  await loadBootstrap();
+  await loadOrders();
+  renderWorkerMeals();
+  renderWorkerCancelPanel();
+  const result = errors.length
+    ? `Đã hủy thành công ${success}/${selected.length} suất. Chưa xử lý được: ${errors.join("; ")}`
+    : `Đã hủy thành công ${success}/${selected.length} suất.`;
+  setMessage("#workerCancelMessage", result, errors.length ? "error" : "success");
+}
+
 async function processWorkerRange(action) {
-  const items = workerRangeItems();
+  const items = action === "register" ? workerActionItems() : workerRangeItems();
   if (!items.length) {
-    setMessage("#workerMessage", "Vui lòng chọn ít nhất một ca ăn.", "error");
+    const mode = document.querySelector("#workerRegisterMode").value;
+    const message =
+      action === "register" && mode !== "day"
+        ? "Vui lòng tích các ngày cần đăng ký và bấm Xác nhận chọn trước khi đăng ký."
+        : "Vui lòng chọn ít nhất một ca ăn.";
+    setMessage("#workerMessage", message, "error");
     return;
   }
   const actionText = action === "register" ? "đăng ký" : "hủy đăng ký";
