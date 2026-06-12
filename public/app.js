@@ -107,6 +107,9 @@ function userDisplayLine(user) {
   if (user.role === "admin") {
     return "Admin";
   }
+  if (user.role === "kitchen") {
+    return "Nhà bếp";
+  }
   if (user.role !== "worker") {
     return `${user.fullName} - ${roleLabel(user.role)} - ${user.department || ""}`;
   }
