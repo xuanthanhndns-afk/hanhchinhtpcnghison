@@ -247,7 +247,7 @@ function normalizeShift(shift) {
 }
 
 function shiftLabel(shift) {
-  return shift === "lunch" ? "Trua" : "Toi";
+  return shift === "lunch" ? "Trưa" : "Tối";
 }
 
 function getMenu(db, mealDate, shift) {

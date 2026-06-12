@@ -964,10 +964,10 @@ async function loadDailyReport() {
     <div class="summary">
       ${data.summary
         .map(
-          (s) => `<div class="metric"><span>${s.shiftLabel}</span><strong>${s.totalQty}</strong><small>Định mức ${s.plannedQty}, bổ sung ${s.addedAfterCutoffQty}, giá trị thực đơn ${money(s.totalMenuValue)}, tiền thu ${money(s.totalAmount)}</small></div>`
+          (s) => `<div class="metric"><span>${s.shiftLabel}</span><strong>${s.totalQty}</strong><small>Định mức ${s.plannedQty}, bổ sung ${s.addedAfterCutoffQty}, giá trị thực đơn <span class="money-red">${money(s.totalMenuValue)}</span>, tiền thu <span class="money-red">${money(s.totalAmount)}</span></small></div>`
         )
         .join("")}
-      <div class="metric"><span>Tổng tiền thu trong ngày</span><strong>${money(data.totalDayAmount)}</strong><small>Tổng tiền ca trưa và ca tối</small></div>
+      <div class="metric"><span>Tổng tiền thu trong ngày</span><strong class="money-red">${money(data.totalDayAmount)}</strong><small>Tổng tiền ca trưa và ca tối</small></div>
     </div>
     <h3>Định lượng thực đơn</h3>
     <div class="table-wrap">
@@ -976,7 +976,7 @@ async function loadDailyReport() {
         <tbody>
           ${data.summary
             .flatMap((s) => (s.menuItems || []).map((item) => ({ shiftLabel: s.shiftLabel, ...item })))
-            .map((item) => `<tr><td>${item.shiftLabel}</td><td>${item.seq}</td><td>${item.name}</td><td>${item.grams}</td><td>${money(item.unitPrice)}</td><td>${money(item.amount)}</td></tr>`)
+            .map((item) => `<tr><td>${item.shiftLabel}</td><td>${item.seq}</td><td>${item.name}</td><td>${item.grams}</td><td><span class="money-red">${money(item.unitPrice)}</span></td><td><span class="money-red">${money(item.amount)}</span></td></tr>`)
             .join("")}
         </tbody>
       </table>
@@ -988,7 +988,7 @@ async function loadDailyReport() {
         <tbody>
           ${data.orders
             .map(
-              (o) => `<tr><td>${o.employeeCode}</td><td>${o.fullName}</td><td>${o.department}</td><td>${shiftLabel(o.shift)}</td><td>${money(o.price)}</td><td>${o.status}</td><td>${o.source}</td></tr>`
+              (o) => `<tr><td>${o.employeeCode}</td><td>${o.fullName}</td><td>${o.department}</td><td>${shiftLabel(o.shift)}</td><td><span class="money-red">${money(o.price)}</span></td><td>${o.status}</td><td>${o.source}</td></tr>`
             )
             .join("")}
         </tbody>
