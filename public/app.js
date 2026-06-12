@@ -7,6 +7,7 @@ const state = {
   menus: [],
   orders: [],
   chefs: [],
+  systemStats: null,
   tab: "worker",
   adminTab: "members",
   kitchenTab: "menu",
@@ -513,6 +514,13 @@ function statusBadge(order) {
 
 function renderAdmin() {
   const workers = state.users.filter((u) => u.role === "worker");
+  const stats = state.systemStats || {
+    totalWorkers: workers.length,
+    telegramLinked: workers.filter((u) => u.telegramChatId).length,
+    onlineUsers: 0,
+    onlineWorkers: 0,
+    onlineWindowMinutes: 15,
+  };
   const view = document.querySelector("#view");
   view.innerHTML = html`
     <div class="subtabs">
@@ -536,7 +544,11 @@ function renderAdmin() {
       </section>
       <section class="panel span-6">
         <h2>Thông tin hệ thống</h2>
-        <p><strong>Tổng thành viên:</strong> ${workers.length}</p>
+        <div class="system-stats">
+          <div class="metric"><span>Tổng thành viên</span><strong>${stats.totalWorkers}</strong><small>Tài khoản công nhân/thành viên</small></div>
+          <div class="metric"><span>Đã kết nối Telegram</span><strong>${stats.telegramLinked}</strong><small>Có Telegram Chat ID</small></div>
+          <div class="metric"><span>Đang online</span><strong>${stats.onlineUsers}</strong><small>${stats.onlineWorkers} thành viên, ${stats.onlineWindowMinutes} phút gần nhất</small></div>
+        </div>
         <p><strong>Tài khoản quản lý:</strong> admin, Nhabep</p>
         <p class="muted">Admin có thể xem toàn bộ tài khoản, xóa thành viên và quản lý dòng tiền trong tab Dòng tiền.</p>
       </section>

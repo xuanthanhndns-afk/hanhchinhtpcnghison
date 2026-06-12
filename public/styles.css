@@ -488,6 +488,21 @@ tr:last-child td {
   font-size: 24px;
 }
 
+.system-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 10px 0 14px;
+}
+
+.system-stats .metric {
+  padding: 10px;
+}
+
+.system-stats .metric strong {
+  font-size: 22px;
+}
+
 .money-red {
   color: #b91c1c;
   font-weight: 700;
@@ -552,5 +567,9 @@ tr:last-child td {
 
   .summary {
     grid-template-columns: repeat(2, minmax(120px, 1fr));
+  }
+
+  .system-stats {
+    grid-template-columns: 1fr;
   }
 }

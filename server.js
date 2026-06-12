@@ -22,6 +22,8 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const TEMPLATES_DIR = path.join(__dirname, "templates");
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 const DATABASE_URL = process.env.DATABASE_URL || "";
+const ONLINE_WINDOW_MINUTES = 15;
+const ONLINE_WINDOW_MS = ONLINE_WINDOW_MINUTES * 60 * 1000;
 
 const sessions = new Map();
 let pgPool = null;
@@ -117,6 +119,7 @@ function getCurrentUser(req) {
   const sid = cookies.sid;
   if (!sid || !sessions.has(sid)) return null;
   const session = sessions.get(sid);
+  session.lastSeen = Date.now();
   const db = readDb();
   return db.users.find((u) => u.id === session.userId) || null;
 }
@@ -138,6 +141,29 @@ function requireRole(req, res, roles) {
     return null;
   }
   return user;
+}
+
+function getSystemStats(db) {
+  const now = Date.now();
+  const since = now - ONLINE_WINDOW_MS;
+  const workers = db.users.filter((u) => u.role === "worker");
+  const onlineUserIds = new Set();
+  for (const [sid, session] of sessions.entries()) {
+    if (session.expiresAt && session.expiresAt < now) {
+      sessions.delete(sid);
+      continue;
+    }
+    if (Number(session.lastSeen || session.createdAt || 0) >= since) {
+      onlineUserIds.add(session.userId);
+    }
+  }
+  return {
+    totalWorkers: workers.length,
+    telegramLinked: workers.filter((u) => u.telegramChatId).length,
+    onlineUsers: onlineUserIds.size,
+    onlineWorkers: workers.filter((u) => onlineUserIds.has(u.id)).length,
+    onlineWindowMinutes: ONLINE_WINDOW_MINUTES,
+  };
 }
 
 function findUserByLogin(db, login) {
@@ -535,7 +561,8 @@ async function api(req, res) {
       }
       if (!user || user.status !== "active") return json(res, 401, { error: "Sai tài khoản hoặc mật khẩu" });
       const sid = crypto.randomUUID();
-      sessions.set(sid, { userId: user.id, createdAt: Date.now() });
+      const now = Date.now();
+      sessions.set(sid, { userId: user.id, createdAt: now, lastSeen: now });
       res.setHeader("set-cookie", `sid=${encodeURIComponent(sid)}; HttpOnly; SameSite=Lax; Path=/`);
       return json(res, 200, { user: sanitizeUser(user) });
     }
@@ -613,6 +640,7 @@ async function api(req, res) {
       return json(res, 200, {
         user: { ...sanitizeUser(user), registrationLockedNow: lock.locked, lockReasonNow: lock.reason || "" },
         settings: db.settings,
+        systemStats: user.role === "admin" ? getSystemStats(db) : null,
         users: user.role === "worker" ? [] : db.users.map(sanitizeUser),
         chefs: db.chefs || [],
         menus: db.menus.sort((a, b) => `${a.mealDate}${a.shift}`.localeCompare(`${b.mealDate}${b.shift}`)),

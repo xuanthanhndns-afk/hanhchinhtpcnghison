@@ -1,6 +1,8 @@
 let xlsxModule = null;
 
 const SESSION_DAYS = 14;
+const ONLINE_WINDOW_MINUTES = 15;
+const ONLINE_WINDOW_MS = ONLINE_WINDOW_MINUTES * 60 * 1000;
 
 const seedDb = {
   settings: {
@@ -121,8 +123,13 @@ async function ensureSchema(env) {
     "CREATE TABLE IF NOT EXISTS app_state (id TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"
   ).run();
   await env.DB.prepare(
-    "CREATE TABLE IF NOT EXISTS sessions (sid TEXT PRIMARY KEY, user_id TEXT NOT NULL, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL)"
+    "CREATE TABLE IF NOT EXISTS sessions (sid TEXT PRIMARY KEY, user_id TEXT NOT NULL, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, last_seen INTEGER NOT NULL DEFAULT 0)"
   ).run();
+  const sessionColumns = await env.DB.prepare("PRAGMA table_info(sessions)").all();
+  const hasLastSeen = (sessionColumns.results || []).some((column) => column.name === "last_seen");
+  if (!hasLastSeen) {
+    await env.DB.prepare("ALTER TABLE sessions ADD COLUMN last_seen INTEGER NOT NULL DEFAULT 0").run();
+  }
 }
 
 async function readDb(env) {
@@ -147,8 +154,8 @@ async function createSession(env, userId) {
   const sid = crypto.randomUUID();
   const createdAt = Date.now();
   const expiresAt = createdAt + SESSION_DAYS * 24 * 60 * 60 * 1000;
-  await env.DB.prepare("INSERT INTO sessions (sid, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)")
-    .bind(sid, userId, createdAt, expiresAt)
+  await env.DB.prepare("INSERT INTO sessions (sid, user_id, created_at, expires_at, last_seen) VALUES (?, ?, ?, ?, ?)")
+    .bind(sid, userId, createdAt, expiresAt, createdAt)
     .run();
   return sid;
 }
@@ -167,6 +174,7 @@ async function getCurrentUser(request, env) {
     await deleteSession(env, sid);
     return null;
   }
+  await env.DB.prepare("UPDATE sessions SET last_seen = ? WHERE sid = ?").bind(Date.now(), sid).run();
   const db = await readDb(env);
   return db.users.find((u) => u.id === session.user_id) || null;
 }
@@ -181,6 +189,27 @@ async function requireRole(request, env, roles) {
   const user = await requireUser(request, env);
   if (!roles.includes(user.role)) throw new ApiError(403, "Khong co quyen thao tac");
   return user;
+}
+
+async function getSystemStats(env, db) {
+  await ensureSchema(env);
+  const now = Date.now();
+  const since = now - ONLINE_WINDOW_MS;
+  await env.DB.prepare("DELETE FROM sessions WHERE expires_at < ?").bind(now).run();
+  const rows = await env.DB.prepare(
+    "SELECT DISTINCT user_id FROM sessions WHERE expires_at >= ? AND COALESCE(NULLIF(last_seen, 0), created_at) >= ?"
+  )
+    .bind(now, since)
+    .all();
+  const onlineUserIds = new Set((rows.results || []).map((row) => row.user_id));
+  const workers = db.users.filter((u) => u.role === "worker");
+  return {
+    totalWorkers: workers.length,
+    telegramLinked: workers.filter((u) => u.telegramChatId).length,
+    onlineUsers: onlineUserIds.size,
+    onlineWorkers: workers.filter((u) => onlineUserIds.has(u.id)).length,
+    onlineWindowMinutes: ONLINE_WINDOW_MINUTES,
+  };
 }
 
 function sanitizeUser(user) {
@@ -585,6 +614,7 @@ async function handleApi(request, env) {
     return json({
       user: { ...sanitizeUser(user), registrationLockedNow: lock.locked, lockReasonNow: lock.reason || "" },
       settings: db.settings,
+      systemStats: user.role === "admin" ? await getSystemStats(env, db) : null,
       users: user.role === "worker" ? [] : db.users.map(sanitizeUser),
       chefs: db.chefs || [],
       menus: db.menus.sort((a, b) => `${a.mealDate}${a.shift}`.localeCompare(`${b.mealDate}${b.shift}`)),
