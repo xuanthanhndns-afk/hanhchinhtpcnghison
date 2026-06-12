@@ -735,7 +735,7 @@ async function renderWorker() {
           </label>
           <fieldset class="shift-picker">
             <legend>Ca ăn</legend>
-            <label><input type="checkbox" name="workerShift" value="lunch" checked /> Trưa</label>
+            <label><input type="checkbox" name="workerShift" value="lunch" /> Trưa</label>
             <label><input type="checkbox" name="workerShift" value="dinner" /> Tối</label>
           </fieldset>
         </div>
@@ -882,7 +882,7 @@ function renderWorkerRangePreview() {
   const shifts = selectedWorkerShifts().map(shiftLabel).join(", ");
   preview.innerHTML = html`
     <div class="notice">
-      Đã chọn ${items.length} suất ăn, từ ${formatDate(firstDate)} đến ${formatDate(lastDate)}, ca: ${shifts}.
+      Đang chọn ${items.length} suất ăn để thao tác, từ ${formatDate(firstDate)} đến ${formatDate(lastDate)}, ca: ${shifts}.
     </div>
   `;
 }
