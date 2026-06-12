@@ -756,9 +756,8 @@ async function renderWorker() {
           </fieldset>
         </div>
         <div class="actions">
-          <button id="registerWorkerRange">Đăng ký các suất đã chọn</button>
-          <button id="cancelWorkerRange" class="danger">Mở danh sách hủy</button>
-          <button id="reloadWorker" class="secondary">Xem thông tin</button>
+          <button id="registerWorkerRange">Đăng ký suất ăn</button>
+          <button id="cancelWorkerRange" class="danger">Hủy đăng ký</button>
           <button id="exportWorkerDay" class="secondary">Xuất Excel theo ngày</button>
         </div>
         <div id="workerCalendar"></div>
@@ -785,7 +784,6 @@ async function renderWorker() {
   document.querySelector("#cancelWorkerRange").addEventListener("click", () => {
     document.querySelector("#workerCancelPanel").scrollIntoView({ behavior: "smooth", block: "start" });
   });
-  document.querySelector("#reloadWorker").addEventListener("click", renderWorkerMeals);
   document.querySelector("#exportWorkerDay").addEventListener("click", exportWorkerDay);
   document.querySelector("#workerCancelMonth").addEventListener("change", renderWorkerCancelPanel);
   updateWorkerRangeView();
