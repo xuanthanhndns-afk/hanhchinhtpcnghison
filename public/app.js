@@ -315,7 +315,7 @@ function renderTabs() {
   if (state.user.role === "admin") tabs.push(["admin", "Admin"]);
   if (state.user.role === "worker") tabs.push(["worker", "Đăng ký của tôi"]);
   if (["admin", "kitchen"].includes(state.user.role)) tabs.push(["kitchen", "Nhà bếp"]);
-  if (["admin", "kitchen"].includes(state.user.role)) tabs.push(["daily", "Báo cáo ngày"]);
+  if (["admin", "kitchen"].includes(state.user.role)) tabs.push(["daily", "Báo cáo"]);
   if (["admin", "kitchen", "worker"].includes(state.user.role)) tabs.push(["monthly", "Dòng tiền"]);
   if (state.user.role === "admin") tabs.push(["reconcile", "Đối soát & Telegram"]);
   tabs.push(["profile", "Hồ sơ"]);
@@ -1365,45 +1365,132 @@ function renderKitchen() {
   }
 }
 
+function departmentOptions() {
+  const departments = Array.from(new Set(state.users.filter((u) => u.role === "worker").map((u) => u.department).filter(Boolean))).sort();
+  return [`<option value="">Tất cả bộ phận</option>`, ...departments.map((department) => `<option value="${department}">${department}</option>`)].join("");
+}
+
+function monthEndDate(month) {
+  const [year, mm] = month.split("-").map(Number);
+  return `${month}-${String(new Date(year, mm, 0).getDate()).padStart(2, "0")}`;
+}
+
+function currentReportRange() {
+  const type = document.querySelector("#reportType").value;
+  if (type === "day") {
+    const date = document.querySelector("#reportDate").value || today;
+    return { startDate: date, endDate: date };
+  }
+  if (type === "month") {
+    const month = document.querySelector("#reportMonth").value || currentMonth;
+    return { startDate: `${month}-01`, endDate: monthEndDate(month) };
+  }
+  return {
+    startDate: document.querySelector("#reportStartDate").value || today,
+    endDate: document.querySelector("#reportEndDate").value || today,
+  };
+}
+
 function renderDaily() {
   const view = document.querySelector("#view");
   view.innerHTML = html`
     <section class="panel">
-      <h2>Báo cáo số suất theo ngày</h2>
-      <div class="row">
-        <label>Ngày ăn <input id="dailyDate" type="date" value="${today}" /></label>
+      <h2>Báo cáo suất ăn</h2>
+      <div class="form-grid report-filter-grid">
+        <label>Loại báo cáo
+          <select id="reportType">
+            <option value="day">Báo cáo theo ngày</option>
+            <option value="month">Báo cáo theo tháng</option>
+            <option value="range">Báo cáo theo khoảng thời gian</option>
+          </select>
+        </label>
+        <label class="report-field" data-report-field="day">Ngày ăn <input id="reportDate" type="date" value="${today}" /></label>
+        <label class="report-field hidden" data-report-field="month">Tháng <input id="reportMonth" type="month" value="${currentMonth}" /></label>
+        <label class="report-field hidden" data-report-field="range">Từ ngày <input id="reportStartDate" type="date" value="${today}" /></label>
+        <label class="report-field hidden" data-report-field="range">Đến ngày <input id="reportEndDate" type="date" value="${today}" /></label>
+        <label>Bộ phận
+          <select id="reportDepartment">${departmentOptions()}</select>
+        </label>
+      </div>
+      <div class="actions">
         <button id="loadDaily">Xem báo cáo</button>
-        <button id="exportDaily" class="secondary">Xuất Excel theo ngày</button>
+        <button id="exportDaily" class="secondary">Xuất Excel báo cáo</button>
       </div>
       <div id="dailyContent"></div>
     </section>
   `;
+  document.querySelector("#reportType").addEventListener("change", updateReportFilterView);
   document.querySelector("#loadDaily").addEventListener("click", loadDailyReport);
   document.querySelector("#exportDaily").addEventListener("click", exportDailyReport);
+  updateReportFilterView();
   loadDailyReport();
 }
 
+function updateReportFilterView() {
+  const type = document.querySelector("#reportType").value;
+  document.querySelectorAll("[data-report-field]").forEach((field) => {
+    field.classList.toggle("hidden", field.dataset.reportField !== type);
+  });
+}
+
 async function loadDailyReport() {
-  const date = document.querySelector("#dailyDate").value;
-  const data = await api(`/api/reports/daily?mealDate=${encodeURIComponent(date)}`);
+  const { startDate, endDate } = currentReportRange();
+  const department = document.querySelector("#reportDepartment").value;
+  if (startDate > endDate) {
+    setMessage("#dailyContent", "Khoảng thời gian không hợp lệ.", "error");
+    return;
+  }
+  const params = new URLSearchParams({ startDate, endDate });
+  if (department) params.set("department", department);
+  const data = await api(`/api/reports/range?${params.toString()}`);
   state.dailyReport = data;
+  renderReportContent(data);
+}
+
+function renderReportContent(data) {
+  const menuRows = data.daily.flatMap((day) =>
+    day.summary.flatMap((summary) => (summary.menuItems || []).map((item) => ({ mealDate: day.mealDate, shiftLabel: summary.shiftLabel, ...item })))
+  );
   document.querySelector("#dailyContent").innerHTML = html`
     <div class="summary">
-      ${data.summary
-        .map(
-          (s) => `<div class="metric"><span>${s.shiftLabel}</span><strong>${s.totalQty}</strong><small>Định mức ${s.plannedQty}, bổ sung ${s.addedAfterCutoffQty}, giá trị thực đơn <span class="money-red">${money(s.totalMenuValue)}</span>, tiền thu <span class="money-red">${money(s.totalAmount)}</span></small></div>`
-        )
-        .join("")}
-      <div class="metric"><span>Tổng tiền thu trong ngày</span><strong class="money-red">${money(data.totalDayAmount)}</strong><small>Tổng tiền ca trưa và ca tối</small></div>
+      <div class="metric"><span>Ca Trưa</span><strong>${data.totals.lunchQty}</strong><small>Tiền thu <span class="money-red">${money(data.orders.filter((o) => o.shift === "lunch").reduce((sum, order) => sum + Number(order.price || 0), 0))}</span></small></div>
+      <div class="metric"><span>Ca Tối</span><strong>${data.totals.dinnerQty}</strong><small>Tiền thu <span class="money-red">${money(data.orders.filter((o) => o.shift === "dinner").reduce((sum, order) => sum + Number(order.price || 0), 0))}</span></small></div>
+      <div class="metric"><span>Tổng suất</span><strong>${data.totals.totalQty}</strong><small>Từ ${formatDate(data.startDate)} đến ${formatDate(data.endDate)}</small></div>
+      <div class="metric"><span>Tổng tiền thu</span><strong class="money-red">${money(data.totals.totalAmount)}</strong><small>${data.department || "Tất cả bộ phận"}</small></div>
+    </div>
+    <h3>Thống kê theo ngày</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Ngày</th><th>Trưa</th><th>Tối</th><th>Tổng suất</th><th>Tổng tiền</th></tr></thead>
+        <tbody>
+          ${data.daily
+            .map((day) => {
+              const lunch = day.summary.find((s) => s.shift === "lunch") || {};
+              const dinner = day.summary.find((s) => s.shift === "dinner") || {};
+              return `<tr><td>${formatDate(day.mealDate)}</td><td>${lunch.totalQty || 0}</td><td>${dinner.totalQty || 0}</td><td>${day.totalQty}</td><td><span class="money-red">${money(day.totalAmount)}</span></td></tr>`;
+            })
+            .join("")}
+        </tbody>
+      </table>
+    </div>
+    <h3>Thống kê theo bộ phận</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Bộ phận</th><th>Trưa</th><th>Tối</th><th>Tổng suất</th><th>Tổng tiền</th></tr></thead>
+        <tbody>
+          ${data.byDepartment
+            .map((row) => `<tr><td>${row.department}</td><td>${row.lunchQty}</td><td>${row.dinnerQty}</td><td>${row.totalQty}</td><td><span class="money-red">${money(row.totalAmount)}</span></td></tr>`)
+            .join("")}
+        </tbody>
+      </table>
     </div>
     <h3>Định lượng thực đơn</h3>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Ca</th><th>STT</th><th>Tên món</th><th>Định lượng (gam)</th><th>Đơn giá</th><th>Thành tiền</th></tr></thead>
+        <thead><tr><th>Ngày</th><th>Ca</th><th>STT</th><th>Tên món</th><th>Định lượng (gam)</th><th>Đơn giá</th><th>Thành tiền</th></tr></thead>
         <tbody>
-          ${data.summary
-            .flatMap((s) => (s.menuItems || []).map((item) => ({ shiftLabel: s.shiftLabel, ...item })))
-            .map((item) => `<tr><td>${item.shiftLabel}</td><td>${item.seq}</td><td>${item.name}</td><td>${item.grams}</td><td><span class="money-red">${money(item.unitPrice)}</span></td><td><span class="money-red">${money(item.amount)}</span></td></tr>`)
+          ${menuRows
+            .map((item) => `<tr><td>${formatDate(item.mealDate)}</td><td>${item.shiftLabel}</td><td>${item.seq}</td><td>${item.name}</td><td>${item.grams}</td><td><span class="money-red">${money(item.unitPrice)}</span></td><td><span class="money-red">${money(item.amount)}</span></td></tr>`)
             .join("")}
         </tbody>
       </table>
@@ -1411,12 +1498,10 @@ async function loadDailyReport() {
     <h3>Danh sách chi tiết</h3>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Mã NV</th><th>Họ tên</th><th>Bộ phận</th><th>Ca</th><th>Giá</th><th>Trạng thái</th><th>Nguồn</th></tr></thead>
+        <thead><tr><th>Ngày</th><th>Số điện thoại</th><th>Họ tên</th><th>Bộ phận</th><th>Ca</th><th>Giá</th><th>Trạng thái</th><th>Nguồn</th></tr></thead>
         <tbody>
           ${data.orders
-            .map(
-              (o) => `<tr><td>${o.employeeCode}</td><td>${o.fullName}</td><td>${o.department}</td><td>${shiftLabel(o.shift)}</td><td><span class="money-red">${money(o.price)}</span></td><td>${o.status}</td><td>${o.source}</td></tr>`
-            )
+            .map((o) => `<tr><td>${formatDate(o.mealDate)}</td><td>${o.phone || o.employeeCode}</td><td>${o.fullName}</td><td>${o.department}</td><td>${shiftLabel(o.shift)}</td><td><span class="money-red">${money(o.price)}</span></td><td>${o.status}</td><td>${o.source}</td></tr>`)
             .join("")}
         </tbody>
       </table>
@@ -1425,56 +1510,38 @@ async function loadDailyReport() {
 }
 
 async function exportDailyReport() {
-  const date = document.querySelector("#dailyDate").value;
-  const data =
-    state.dailyReport && state.dailyReport.mealDate === date
-      ? state.dailyReport
-      : await api(`/api/reports/daily?mealDate=${encodeURIComponent(date)}`);
-  state.dailyReport = data;
-  const menuRows = data.summary.flatMap((s) =>
-    (s.menuItems || []).map((item) => [
-      s.shiftLabel,
-      item.seq,
-      item.name,
-      item.grams,
-      item.unitPrice,
-      item.amount,
-    ])
+  await loadDailyReport();
+  const data = state.dailyReport;
+  const menuRows = data.daily.flatMap((day) =>
+    day.summary.flatMap((summary) =>
+      (summary.menuItems || []).map((item) => [day.mealDate, summary.shiftLabel, item.seq, item.name, item.grams, item.unitPrice, item.amount])
+    )
   );
-  const orderRows = data.orders.map((o) => [
-    o.employeeCode,
-    o.fullName,
-    o.department,
-    shiftLabel(o.shift),
-    o.price,
-    o.status,
-    o.source,
-  ]);
-  downloadExcel(`bao-cao-ngay-${date}.xls`, `Báo cáo số suất theo ngày ${date}`, [
+  const detailRows = data.orders.map((o) => [o.mealDate, o.phone || o.employeeCode, o.fullName, o.department, shiftLabel(o.shift), o.price, o.status, o.source]);
+  downloadExcel(`bao-cao-suat-an-${data.startDate}-${data.endDate}.xls`, `Báo cáo suất ăn ${data.startDate} - ${data.endDate}`, [
     {
-      title: "Tổng hợp theo ca",
-      headers: ["Ca", "Số suất", "Định mức", "Bổ sung sau 08h", "Giá trị thực đơn", "Tiền thu"],
-      rows: [
-        ...data.summary.map((s) => [
-          s.shiftLabel,
-          s.totalQty,
-          s.plannedQty,
-          s.addedAfterCutoffQty,
-          s.totalMenuValue,
-          s.totalAmount,
-        ]),
-        ["Tổng trong ngày", "", "", "", "", data.totalDayAmount],
-      ],
+      title: "Tổng hợp theo ngày",
+      headers: ["Ngày", "Trưa", "Tối", "Tổng suất", "Tổng tiền"],
+      rows: data.daily.map((day) => {
+        const lunch = day.summary.find((s) => s.shift === "lunch") || {};
+        const dinner = day.summary.find((s) => s.shift === "dinner") || {};
+        return [day.mealDate, lunch.totalQty || 0, dinner.totalQty || 0, day.totalQty, day.totalAmount];
+      }),
+    },
+    {
+      title: "Tổng hợp theo bộ phận",
+      headers: ["Bộ phận", "Trưa", "Tối", "Tổng suất", "Tổng tiền"],
+      rows: data.byDepartment.map((row) => [row.department, row.lunchQty, row.dinnerQty, row.totalQty, row.totalAmount]),
     },
     {
       title: "Định lượng thực đơn",
-      headers: ["Ca", "STT", "Tên món", "Định lượng (gam)", "Đơn giá", "Thành tiền"],
+      headers: ["Ngày", "Ca", "STT", "Tên món", "Định lượng (gam)", "Đơn giá", "Thành tiền"],
       rows: menuRows,
     },
     {
       title: "Danh sách chi tiết",
-      headers: ["Mã NV", "Họ tên", "Bộ phận", "Ca", "Giá", "Trạng thái", "Nguồn"],
-      rows: orderRows,
+      headers: ["Ngày", "Số điện thoại", "Họ tên", "Bộ phận", "Ca", "Giá", "Trạng thái", "Nguồn"],
+      rows: detailRows,
     },
   ]);
 }

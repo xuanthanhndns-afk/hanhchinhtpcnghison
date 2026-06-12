@@ -287,6 +287,82 @@ function activeBillableOrders(db, month) {
   });
 }
 
+function isActiveOrderStatus(status) {
+  return ["registered", "locked", "added_after_cutoff"].includes(status);
+}
+
+function buildRangeReport(db, startDate, endDate, department = "") {
+  const workerByCode = new Map(db.users.filter((u) => u.role === "worker").map((u) => [u.employeeCode, u]));
+  const orders = db.orders
+    .filter((o) => isActiveOrderStatus(o.status))
+    .filter((o) => o.mealDate >= startDate && o.mealDate <= endDate)
+    .map((order) => {
+      const worker = workerByCode.get(order.employeeCode) || {};
+      return {
+        ...order,
+        fullName: order.fullName || worker.fullName || "",
+        department: order.department || worker.department || "",
+        phone: worker.phone || "",
+      };
+    })
+    .filter((order) => !department || order.department === department)
+    .sort((a, b) => `${a.mealDate}-${a.shift}-${a.fullName}`.localeCompare(`${b.mealDate}-${b.shift}-${b.fullName}`));
+
+  const dayKeys = Array.from(new Set([...orders.map((o) => o.mealDate), ...db.menus.filter((m) => m.mealDate >= startDate && m.mealDate <= endDate).map((m) => m.mealDate)])).sort();
+  const daily = dayKeys.map((mealDate) => {
+    const summary = ["lunch", "dinner"].map((shift) => {
+      const menu = getMenu(db, mealDate, shift);
+      const rows = orders.filter((o) => o.mealDate === mealDate && o.shift === shift);
+      const added = rows.filter((o) => o.status === "added_after_cutoff").length;
+      const totalAmount = rows.reduce((sum, order) => sum + Number(order.price || 0), 0);
+      return {
+        mealDate,
+        shift,
+        shiftLabel: shiftLabel(shift),
+        plannedQty: menu ? menu.plannedQty : 0,
+        menuItems: menu ? menu.items || [] : [],
+        totalMenuValue: menu ? Number(menu.totalMenuValue || 0) : 0,
+        registeredQty: rows.length - added,
+        addedAfterCutoffQty: added,
+        totalQty: rows.length,
+        totalAmount,
+      };
+    });
+    return {
+      mealDate,
+      summary,
+      totalQty: summary.reduce((sum, item) => sum + item.totalQty, 0),
+      totalAmount: summary.reduce((sum, item) => sum + item.totalAmount, 0),
+    };
+  });
+  const byDepartment = Array.from(
+    orders.reduce((map, order) => {
+      const key = order.department || "Chua co bo phan";
+      const item = map.get(key) || { department: key, lunchQty: 0, dinnerQty: 0, totalQty: 0, totalAmount: 0 };
+      if (order.shift === "lunch") item.lunchQty += 1;
+      if (order.shift === "dinner") item.dinnerQty += 1;
+      item.totalQty += 1;
+      item.totalAmount += Number(order.price || 0);
+      map.set(key, item);
+      return map;
+    }, new Map()).values()
+  ).sort((a, b) => a.department.localeCompare(b.department));
+  return {
+    startDate,
+    endDate,
+    department,
+    daily,
+    byDepartment,
+    orders,
+    totals: {
+      lunchQty: orders.filter((o) => o.shift === "lunch").length,
+      dinnerQty: orders.filter((o) => o.shift === "dinner").length,
+      totalQty: orders.length,
+      totalAmount: orders.reduce((sum, order) => sum + Number(order.price || 0), 0),
+    },
+  };
+}
+
 function paymentCode(accountId, month) {
   const [year, mm] = month.split("-");
   return `${accountId} COM T${mm}-${year}`;
@@ -941,6 +1017,15 @@ async function handleApi(request, env) {
     });
     const totalDayAmount = summary.reduce((sum, item) => sum + item.totalAmount, 0);
     return json({ mealDate, summary, totalDayAmount, orders });
+  }
+
+  if (route === "GET /api/reports/range") {
+    await requireRole(request, env, ["admin", "kitchen"]);
+    const db = await readDb(env);
+    const startDate = String(url.searchParams.get("startDate") || new Date().toISOString().slice(0, 10)).slice(0, 10);
+    const endDate = String(url.searchParams.get("endDate") || startDate).slice(0, 10);
+    const department = String(url.searchParams.get("department") || "");
+    return json(buildRangeReport(db, startDate, endDate, department));
   }
 
   if (route === "GET /api/reports/monthly") {

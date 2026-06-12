@@ -340,6 +340,12 @@ label {
   margin-top: 16px;
 }
 
+.report-filter-grid {
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  align-items: end;
+  margin-bottom: 12px;
+}
+
 .cancel-order-list {
   display: grid;
   gap: 8px;
