@@ -320,6 +320,20 @@ label {
   font-size: 12px;
 }
 
+.calendar-shifts {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.calendar-shifts label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink);
+}
+
 .calendar-day.selected {
   border-color: var(--accent);
   background: #eaf6fa;

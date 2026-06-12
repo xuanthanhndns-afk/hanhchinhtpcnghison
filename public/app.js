@@ -796,6 +796,12 @@ function selectedWorkerShifts() {
   return Array.from(document.querySelectorAll("[name='workerShift']:checked")).map((input) => input.value);
 }
 
+function selectedCalendarShiftItems() {
+  return Array.from(document.querySelectorAll("[data-worker-calendar-shift]:checked"))
+    .map((input) => ({ date: input.dataset.date, shift: input.value }))
+    .sort((a, b) => `${a.date}-${a.shift}`.localeCompare(`${b.date}-${b.shift}`));
+}
+
 function workerBaseRangeDates() {
   const mode = document.querySelector("#workerRegisterMode").value;
   if (mode === "day") {
@@ -819,12 +825,15 @@ function workerBaseRangeDates() {
 }
 
 function workerRangeDates() {
-  const calendarInputs = Array.from(document.querySelectorAll("[data-worker-calendar-date]"));
-  if (calendarInputs.length) return calendarInputs.filter((input) => input.checked).map((input) => input.value);
+  const calendarItems = selectedCalendarShiftItems();
+  if (calendarItems.length) return Array.from(new Set(calendarItems.map((item) => item.date)));
+  if (document.querySelectorAll("[data-worker-calendar-shift]").length) return [];
   return workerBaseRangeDates();
 }
 
 function workerRangeItems() {
+  const calendarItems = selectedCalendarShiftItems();
+  if (calendarItems.length || document.querySelectorAll("[data-worker-calendar-shift]").length) return calendarItems;
   const shifts = selectedWorkerShifts();
   return workerRangeDates().flatMap((date) => shifts.map((shift) => ({ date, shift })));
 }
@@ -837,7 +846,8 @@ function workerRangeKey() {
       : mode === "week"
         ? document.querySelector("#workerWeekDate").value
         : document.querySelector("#workerMonth").value;
-  return `${mode}|${dateKey}|${selectedWorkerShifts().sort().join(",")}|${workerRangeDates().join(",")}`;
+  const itemKey = workerRangeItems().map((item) => `${item.date}:${item.shift}`).join(",");
+  return `${mode}|${dateKey}|${itemKey}`;
 }
 
 function workerActionItems() {
@@ -869,6 +879,7 @@ function updateWorkerRangeView() {
   document.querySelectorAll("[data-mode-field]").forEach((field) => {
     field.classList.toggle("hidden", field.dataset.modeField !== mode);
   });
+  document.querySelector(".shift-picker").classList.toggle("hidden", mode !== "day");
   renderWorkerCalendar();
   renderWorkerRangePreview();
   renderWorkerMeals();
@@ -904,20 +915,25 @@ function renderWorkerCalendar() {
         ${dates
           .map((date) => {
             const past = isPastDate(date);
-            return `<label class="calendar-day ${past ? "disabled" : "selected"}">
-              <input type="checkbox" data-worker-calendar-date value="${date}" ${past ? "disabled" : "checked"} />
+            const disabled = past ? "disabled" : "";
+            return `<div class="calendar-day ${past ? "disabled" : ""}">
               <span>${dateFromIso(date).getDate()}</span>
               <small>${formatDate(date)}${past ? " - Đã qua" : ""}</small>
-            </label>`;
+              <div class="calendar-shifts">
+                <label><input type="checkbox" data-worker-calendar-shift data-date="${date}" value="lunch" ${disabled} /> Trưa</label>
+                <label><input type="checkbox" data-worker-calendar-shift data-date="${date}" value="dinner" ${disabled} /> Tối</label>
+              </div>
+            </div>`;
           })
           .join("")}
       </div>
     </div>
   `;
-  calendar.querySelectorAll("[data-worker-calendar-date]").forEach((input) => {
+  calendar.querySelectorAll("[data-worker-calendar-shift]").forEach((input) => {
     input.addEventListener("change", () => {
       invalidateWorkerConfirmedRange();
-      input.closest(".calendar-day").classList.toggle("selected", input.checked);
+      const day = input.closest(".calendar-day");
+      day.classList.toggle("selected", Boolean(day.querySelector("[data-worker-calendar-shift]:checked")));
       renderWorkerRangePreview();
       renderWorkerMeals();
     });
@@ -925,17 +941,17 @@ function renderWorkerCalendar() {
   calendar.querySelector("#confirmWorkerDates").addEventListener("click", confirmWorkerRangeSelection);
   calendar.querySelector("#selectAllWorkerDates").addEventListener("click", () => {
     invalidateWorkerConfirmedRange();
-    calendar.querySelectorAll("[data-worker-calendar-date]").forEach((input) => {
+    calendar.querySelectorAll("[data-worker-calendar-shift]").forEach((input) => {
       if (input.disabled) return;
       input.checked = true;
-      input.closest(".calendar-day").classList.add("selected");
     });
+    calendar.querySelectorAll(".calendar-day:not(.blank):not(.disabled)").forEach((day) => day.classList.add("selected"));
     renderWorkerRangePreview();
     renderWorkerMeals();
   });
   calendar.querySelector("#clearWorkerDates").addEventListener("click", () => {
     invalidateWorkerConfirmedRange();
-    calendar.querySelectorAll("[data-worker-calendar-date]").forEach((input) => {
+    calendar.querySelectorAll("[data-worker-calendar-shift]").forEach((input) => {
       input.checked = false;
       input.closest(".calendar-day").classList.remove("selected");
     });
@@ -955,10 +971,12 @@ function renderWorkerRangePreview() {
   const confirmed = mode === "day" || state.workerConfirmedRange?.key === workerRangeKey();
   const firstDate = items[0].date;
   const lastDate = items[items.length - 1].date;
-  const shifts = selectedWorkerShifts().map(shiftLabel).join(", ");
+  const lunchCount = items.filter((item) => item.shift === "lunch").length;
+  const dinnerCount = items.filter((item) => item.shift === "dinner").length;
+  const shiftSummary = [`Trưa: ${lunchCount}`, `Tối: ${dinnerCount}`].filter((text) => !text.endsWith(": 0")).join(", ");
   preview.innerHTML = html`
     <div class="notice ${confirmed ? "" : "bad-notice"}">
-      ${confirmed ? "Đã xác nhận" : "Đang chọn"} ${items.length} suất ăn, từ ${formatDate(firstDate)} đến ${formatDate(lastDate)}, ca: ${shifts}.${confirmed ? "" : " Vui lòng bấm Xác nhận chọn trước khi đăng ký."}
+      ${confirmed ? "Đã xác nhận" : "Đang chọn"} ${items.length} suất ăn, từ ${formatDate(firstDate)} đến ${formatDate(lastDate)}, ${shiftSummary}.${confirmed ? "" : " Vui lòng bấm Xác nhận chọn trước khi đăng ký."}
     </div>
   `;
 }
@@ -1137,11 +1155,13 @@ async function processWorkerRange(action) {
   const actionText = action === "register" ? "đăng ký" : "hủy đăng ký";
   const firstDate = items[0].date;
   const lastDate = items[items.length - 1].date;
-  const shifts = selectedWorkerShifts().map(shiftLabel).join(", ");
+  const lunchCount = items.filter((item) => item.shift === "lunch").length;
+  const dinnerCount = items.filter((item) => item.shift === "dinner").length;
+  const shiftSummary = [`Trưa: ${lunchCount}`, `Tối: ${dinnerCount}`].filter((text) => !text.endsWith(": 0")).join(", ");
   const message =
     action === "register"
-      ? `Bạn có chắc chắn đã kiểm tra thông tin đăng ký chưa?\n\nThao tác: Đăng ký ${items.length} suất\nTừ ngày: ${formatDate(firstDate)}\nĐến ngày: ${formatDate(lastDate)}\nCa ăn: ${shifts}`
-      : `Bạn có chắc chắn muốn hủy các suất đã chọn?\n\nThao tác: Hủy ${items.length} suất\nTừ ngày: ${formatDate(firstDate)}\nĐến ngày: ${formatDate(lastDate)}\nCa ăn: ${shifts}`;
+      ? `Bạn có chắc chắn đã kiểm tra thông tin đăng ký chưa?\n\nThao tác: Đăng ký ${items.length} suất\nTừ ngày: ${formatDate(firstDate)}\nĐến ngày: ${formatDate(lastDate)}\nChi tiết: ${shiftSummary}`
+      : `Bạn có chắc chắn muốn hủy các suất đã chọn?\n\nThao tác: Hủy ${items.length} suất\nTừ ngày: ${formatDate(firstDate)}\nĐến ngày: ${formatDate(lastDate)}\nChi tiết: ${shiftSummary}`;
   if (!confirm(message)) return;
 
   let success = 0;
