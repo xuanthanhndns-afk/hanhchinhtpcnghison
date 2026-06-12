@@ -25,13 +25,13 @@ const seedDb = {
   users: [
     {
       id: "u-admin",
-      employeeCode: "admin",
+      employeeCode: "Admin",
       password: "123456",
       fullName: "Quan tri he thong",
       department: "Admin",
       role: "admin",
       status: "active",
-      phone: "admin",
+      phone: "Admin",
       mustChangePassword: false,
       registrationLocked: false,
       lockedReason: "",

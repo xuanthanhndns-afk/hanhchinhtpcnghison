@@ -577,7 +577,7 @@ function renderAdmin() {
           <div class="metric"><span>Đã kết nối Telegram</span><strong>${stats.telegramLinked}</strong><small>Có Telegram Chat ID</small></div>
           <div class="metric"><span>Đang online</span><strong>${stats.onlineUsers}</strong><small>${stats.onlineWorkers} thành viên, ${stats.onlineWindowMinutes} phút gần nhất</small></div>
         </div>
-        <p><strong>Tài khoản quản lý:</strong> admin, Nhabep</p>
+        <p><strong>Tài khoản quản lý:</strong> Admin, Nhabep</p>
         <p class="muted">Admin có thể xem toàn bộ tài khoản, xóa thành viên và quản lý dòng tiền trong tab Dòng tiền.</p>
       </section>
       <section class="panel span-12">
