@@ -3,6 +3,20 @@ let xlsxModule = null;
 const SESSION_DAYS = 14;
 const ONLINE_WINDOW_MINUTES = 15;
 const ONLINE_WINDOW_MS = ONLINE_WINDOW_MINUTES * 60 * 1000;
+const MEAL_LOCATIONS = [
+  "Trạm cân",
+  "Trạm điện 220",
+  "Nhà Hóa",
+  "CCR",
+  "Lò Máy phó",
+  "Trực phụ",
+  "Nhà FGD",
+  "Nhiên liệu",
+  "Cảng",
+  "Tuần hoàn",
+  "Phòng Thải xỉ",
+  "Căng tin",
+];
 
 const seedDb = {
   settings: {
@@ -291,6 +305,30 @@ function isActiveOrderStatus(status) {
   return ["registered", "locked", "added_after_cutoff"].includes(status);
 }
 
+function normalizeMealLocation(value) {
+  const raw = String(value || "").trim();
+  return MEAL_LOCATIONS.find((location) => location.toLowerCase() === raw.toLowerCase()) || "";
+}
+
+function buildLocationStats(orders) {
+  return Array.from(
+    orders.reduce((map, order) => {
+      const location = order.mealLocation || order.location || "Chưa chọn vị trí";
+      const key = `${order.mealDate}|${order.shift}|${location}`;
+      const item = map.get(key) || {
+        mealDate: order.mealDate,
+        shift: order.shift,
+        shiftLabel: shiftLabel(order.shift),
+        mealLocation: location,
+        qty: 0,
+      };
+      item.qty += 1;
+      map.set(key, item);
+      return map;
+    }, new Map()).values()
+  ).sort((a, b) => `${a.mealDate}-${a.shift}-${a.mealLocation}`.localeCompare(`${b.mealDate}-${b.shift}-${b.mealLocation}`));
+}
+
 function buildRangeReport(db, startDate, endDate, department = "") {
   const workerByCode = new Map(db.users.filter((u) => u.role === "worker").map((u) => [u.employeeCode, u]));
   const orders = db.orders
@@ -303,6 +341,7 @@ function buildRangeReport(db, startDate, endDate, department = "") {
         fullName: order.fullName || worker.fullName || "",
         department: order.department || worker.department || "",
         phone: worker.phone || "",
+        mealLocation: order.mealLocation || order.location || "",
       };
     })
     .filter((order) => !department || order.department === department)
@@ -315,6 +354,7 @@ function buildRangeReport(db, startDate, endDate, department = "") {
       const rows = orders.filter((o) => o.mealDate === mealDate && o.shift === shift);
       const added = rows.filter((o) => o.status === "added_after_cutoff").length;
       const totalAmount = rows.reduce((sum, order) => sum + Number(order.price || 0), 0);
+      const byLocation = buildLocationStats(rows);
       return {
         mealDate,
         shift,
@@ -326,6 +366,7 @@ function buildRangeReport(db, startDate, endDate, department = "") {
         addedAfterCutoffQty: added,
         totalQty: rows.length,
         totalAmount,
+        byLocation,
       };
     });
     return {
@@ -352,6 +393,7 @@ function buildRangeReport(db, startDate, endDate, department = "") {
     endDate,
     department,
     daily,
+    byLocation: buildLocationStats(orders),
     byDepartment,
     orders,
     totals: {
@@ -950,6 +992,8 @@ async function handleApi(request, env) {
       throw new ApiError(400, "Không thể đăng ký suất ăn cho ngày đã qua");
     }
     const shift = normalizeShift(body.shift);
+    const mealLocation = normalizeMealLocation(body.mealLocation || body.location);
+    if (!mealLocation) throw new ApiError(400, "Vui long chon vi tri an hop le truoc khi dang ky suat an");
     const beforeCutoff = isBeforeCutoff(mealDate, db.settings.cutoffTime);
     if (!beforeCutoff && user.role === "worker") throw new ApiError(400, "Đã quá 08h, người dùng không được tự đăng ký suất ăn trong ngày này");
     if (!beforeCutoff && user.role !== "kitchen" && user.role !== "admin") throw new ApiError(400, "Sau giờ chốt chỉ nhà bếp hoặc admin được bổ sung suất ăn");
@@ -966,6 +1010,7 @@ async function handleApi(request, env) {
       department: worker.department,
       mealDate,
       shift,
+      mealLocation,
       price: menu ? Number(menu.price) : Number(db.settings.defaultMealPrice),
       status: beforeCutoff ? "registered" : "added_after_cutoff",
       source: beforeCutoff ? (user.role === "worker" ? "self_before_cutoff" : "staff_before_cutoff") : "kitchen_after_cutoff",

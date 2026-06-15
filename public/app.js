@@ -22,6 +22,21 @@ const today = (() => {
 })();
 const currentMonth = today.slice(0, 7);
 
+const MEAL_LOCATIONS = [
+  "Trạm cân",
+  "Trạm điện 220",
+  "Nhà Hóa",
+  "CCR",
+  "Lò Máy phó",
+  "Trực phụ",
+  "Nhà FGD",
+  "Nhiên liệu",
+  "Cảng",
+  "Tuần hoàn",
+  "Phòng Thải xỉ",
+  "Căng tin",
+];
+
 function dateFromIso(value) {
   const [year, month, day] = String(value || today).slice(0, 10).split("-").map(Number);
   return new Date(year, month - 1, day);
@@ -64,6 +79,21 @@ function registrationMinDate() {
 
 function isActiveOrderStatus(status) {
   return ["registered", "locked", "added_after_cutoff"].includes(status);
+}
+
+function mealLocationOptions(selected = "") {
+  return [
+    `<option value="">Chọn vị trí ăn</option>`,
+    ...MEAL_LOCATIONS.map((location) => `<option value="${location}" ${selected === location ? "selected" : ""}>${location}</option>`),
+  ].join("");
+}
+
+function selectedMealLocation() {
+  return document.querySelector("#workerMealLocation")?.value || "";
+}
+
+function orderMealLocation(order) {
+  return order.mealLocation || order.location || "Chưa chọn vị trí";
 }
 
 function money(value) {
@@ -800,6 +830,9 @@ async function renderWorker() {
             <label><input type="checkbox" name="workerShift" value="lunch" /> Trưa</label>
             <label><input type="checkbox" name="workerShift" value="dinner" /> Tối</label>
           </fieldset>
+          <label>Vị trí ăn
+            <select id="workerMealLocation">${mealLocationOptions()}</select>
+          </label>
         </div>
         <div class="actions">
           <button id="registerWorkerRange">Đăng ký suất ăn</button>
@@ -826,6 +859,7 @@ async function renderWorker() {
   document.querySelector("#workerWeekDate").addEventListener("change", updateWorkerRangeView);
   document.querySelector("#workerMonth").addEventListener("change", updateWorkerRangeView);
   document.querySelectorAll("[name='workerShift']").forEach((input) => input.addEventListener("change", updateWorkerRangeView));
+  document.querySelector("#workerMealLocation").addEventListener("change", updateWorkerRangeView);
   document.querySelector("#registerWorkerRange").addEventListener("click", () => processWorkerRange("register"));
   document.querySelector("#cancelWorkerRange").addEventListener("click", () => {
     document.querySelector("#workerCancelPanel").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -910,6 +944,10 @@ function confirmWorkerRangeSelection() {
   const items = workerRangeItems();
   if (!items.length) {
     setMessage("#workerMessage", "Vui lòng chọn ít nhất một ngày và ít nhất một ca ăn.", "error");
+    return;
+  }
+  if (!selectedMealLocation()) {
+    setMessage("#workerMessage", "Vui lòng chọn vị trí ăn trước khi xác nhận đăng ký.", "error");
     return;
   }
   state.workerConfirmedRange = { key: workerRangeKey(), items };
@@ -1006,21 +1044,26 @@ function renderWorkerCalendar() {
 
 function renderWorkerRangePreview() {
   const preview = document.querySelector("#workerRangePreview");
+  const mode = document.querySelector("#workerRegisterMode").value;
+  if (mode === "day") {
+    preview.innerHTML = "";
+    return;
+  }
   const items = workerRangeItems();
   if (!items.length) {
     preview.innerHTML = `<div class="notice bad-notice">Vui lòng chọn ít nhất một ngày và ít nhất một ca ăn.</div>`;
     return;
   }
-  const mode = document.querySelector("#workerRegisterMode").value;
-  const confirmed = mode === "day" || state.workerConfirmedRange?.key === workerRangeKey();
+  const confirmed = state.workerConfirmedRange?.key === workerRangeKey();
   const firstDate = items[0].date;
   const lastDate = items[items.length - 1].date;
   const lunchCount = items.filter((item) => item.shift === "lunch").length;
   const dinnerCount = items.filter((item) => item.shift === "dinner").length;
   const shiftSummary = [`Trưa: ${lunchCount}`, `Tối: ${dinnerCount}`].filter((text) => !text.endsWith(": 0")).join(", ");
+  const location = selectedMealLocation();
   preview.innerHTML = html`
     <div class="notice ${confirmed ? "" : "bad-notice"}">
-      ${confirmed ? "Đã xác nhận" : "Đang chọn"} ${items.length} suất ăn, từ ${formatDate(firstDate)} đến ${formatDate(lastDate)}, ${shiftSummary}.${confirmed ? "" : " Vui lòng bấm Xác nhận chọn trước khi đăng ký."}
+      ${confirmed ? "Đã xác nhận" : "Đang chọn"} ${items.length} suất ăn, từ ${formatDate(firstDate)} đến ${formatDate(lastDate)}, ${shiftSummary}${location ? `, vị trí: ${location}` : ""}.${confirmed ? "" : " Vui lòng bấm Xác nhận chọn trước khi đăng ký."}
     </div>
   `;
 }
@@ -1041,7 +1084,6 @@ function renderWorkerMeals() {
   if (!date || !selectedWorkerShifts().length) {
     container.innerHTML = html`
       ${state.user.registrationLockedNow ? `<div class="notice bad-notice">Không thể đăng ký cơm cho đến khi thanh toán thành công.</div>` : ""}
-      <div class="notice bad-notice">Vui lòng chọn ít nhất một ngày và ít nhất một ca ăn để xem thông tin suất ăn.</div>
       <div id="workerMessage"></div>
     `;
     return;
@@ -1050,7 +1092,7 @@ function renderWorkerMeals() {
     ${state.user.registrationLockedNow ? `<div class="notice bad-notice">Không thể đăng ký cơm cho đến khi thanh toán thành công.</div>` : ""}
     <h3>Thông tin suất ăn ngày ${formatDate(date)}</h3>
     <div class="grid">
-      ${["lunch", "dinner"].map((shift) => renderMealCard(date, shift, disabled)).join("")}
+      ${selectedWorkerShifts().map((shift) => renderMealCard(date, shift, disabled)).join("")}
     </div>
     <div id="workerMessage"></div>
   `;
@@ -1194,6 +1236,11 @@ async function processWorkerRange(action) {
     setMessage("#workerMessage", "Đã quá giờ chốt, không thể đăng ký suất ăn cho ngày hôm nay hoặc ngày đã qua.", "error");
     return;
   }
+  const mealLocation = selectedMealLocation();
+  if (action === "register" && !mealLocation) {
+    setMessage("#workerMessage", "Vui lòng chọn vị trí ăn trước khi đăng ký suất ăn.", "error");
+    return;
+  }
   const actionText = action === "register" ? "đăng ký" : "hủy đăng ký";
   const firstDate = items[0].date;
   const lastDate = items[items.length - 1].date;
@@ -1202,7 +1249,7 @@ async function processWorkerRange(action) {
   const shiftSummary = [`Trưa: ${lunchCount}`, `Tối: ${dinnerCount}`].filter((text) => !text.endsWith(": 0")).join(", ");
   const message =
     action === "register"
-      ? `Bạn có chắc chắn đã kiểm tra thông tin đăng ký chưa?\n\nThao tác: Đăng ký ${items.length} suất\nTừ ngày: ${formatDate(firstDate)}\nĐến ngày: ${formatDate(lastDate)}\nChi tiết: ${shiftSummary}`
+      ? `Bạn có chắc chắn đã kiểm tra thông tin đăng ký chưa?\n\nThao tác: Đăng ký ${items.length} suất\nTừ ngày: ${formatDate(firstDate)}\nĐến ngày: ${formatDate(lastDate)}\nChi tiết: ${shiftSummary}\nVị trí ăn: ${mealLocation}`
       : `Bạn có chắc chắn muốn hủy các suất đã chọn?\n\nThao tác: Hủy ${items.length} suất\nTừ ngày: ${formatDate(firstDate)}\nĐến ngày: ${formatDate(lastDate)}\nChi tiết: ${shiftSummary}`;
   if (!confirm(message)) return;
 
@@ -1212,7 +1259,7 @@ async function processWorkerRange(action) {
     try {
       await api(action === "register" ? "/api/orders/register" : "/api/orders/cancel", {
         method: "POST",
-        body: JSON.stringify({ mealDate: item.date, shift: item.shift }),
+        body: JSON.stringify({ mealDate: item.date, shift: item.shift, mealLocation }),
       });
       success += 1;
     } catch (err) {
@@ -1231,17 +1278,22 @@ async function processWorkerRange(action) {
 
 async function registerOrder(date, shift, employeeCode = "") {
   try {
+    const mealLocation = state.tab === "worker" ? selectedMealLocation() : document.querySelector("#addOrderMealLocation")?.value || "";
     if (state.tab === "worker") {
       if (isRegistrationClosedDate(date)) {
         setMessage("#workerMessage", "Đã quá giờ chốt, không thể đăng ký suất ăn cho ngày hôm nay hoặc ngày đã qua.", "error");
         return;
       }
-      const ok = confirm(`Bạn có chắc chắn đã kiểm tra thông tin đăng ký chưa?\n\nNgày ăn: ${formatDate(date)}\nCa ăn: ${shiftLabel(shift)}`);
+      if (!mealLocation) {
+        setMessage("#workerMessage", "Vui lòng chọn vị trí ăn trước khi đăng ký suất ăn.", "error");
+        return;
+      }
+      const ok = confirm(`Bạn có chắc chắn đã kiểm tra thông tin đăng ký chưa?\n\nNgày ăn: ${formatDate(date)}\nCa ăn: ${shiftLabel(shift)}\nVị trí ăn: ${mealLocation}`);
       if (!ok) return;
     }
     await api("/api/orders/register", {
       method: "POST",
-      body: JSON.stringify({ mealDate: date, shift, employeeCode }),
+      body: JSON.stringify({ mealDate: date, shift, employeeCode, mealLocation }),
     });
     await loadBootstrap();
     await loadOrders(date);
@@ -1383,6 +1435,9 @@ function renderKitchen() {
                 <option value="lunch">Trưa</option>
                 <option value="dinner">Tối</option>
               </select>
+            </label>
+            <label>Vị trí ăn
+              <select id="addOrderMealLocation" name="mealLocation">${mealLocationOptions()}</select>
             </label>
             <label>Ghi chú <input name="note" placeholder="Đăng ký trực tiếp với bếp" /></label>
           </div>
@@ -1553,6 +1608,17 @@ function renderReportContent(data) {
         </tbody>
       </table>
     </div>
+    <h3>Thống kê suất theo vị trí giao cơm</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Ngày</th><th>Ca</th><th>Vị trí ăn</th><th>Số suất</th></tr></thead>
+        <tbody>
+          ${(data.byLocation || [])
+            .map((row) => `<tr><td>${formatDate(row.mealDate)}</td><td><span class="shift-badge ${row.shift}">${row.shiftLabel}</span></td><td>${row.mealLocation}</td><td>${row.qty}</td></tr>`)
+            .join("")}
+        </tbody>
+      </table>
+    </div>
     <h3>Định lượng thực đơn</h3>
     <div class="table-wrap">
       <table>
@@ -1567,10 +1633,10 @@ function renderReportContent(data) {
     <h3>Danh sách chi tiết</h3>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Ngày</th><th>Số điện thoại</th><th>Họ tên</th><th>Bộ phận</th><th>Ca</th><th>Giá</th><th>Trạng thái</th><th>Nguồn</th></tr></thead>
+        <thead><tr><th>Ngày</th><th>Số điện thoại</th><th>Họ tên</th><th>Bộ phận</th><th>Ca</th><th>Vị trí ăn</th><th>Giá</th><th>Trạng thái</th><th>Nguồn</th></tr></thead>
         <tbody>
           ${data.orders
-            .map((o) => `<tr><td>${formatDate(o.mealDate)}</td><td>${o.phone || o.employeeCode}</td><td>${o.fullName}</td><td>${o.department}</td><td>${shiftLabel(o.shift)}</td><td><span class="money-red">${money(o.price)}</span></td><td>${o.status}</td><td>${o.source}</td></tr>`)
+            .map((o) => `<tr><td>${formatDate(o.mealDate)}</td><td>${o.phone || o.employeeCode}</td><td>${o.fullName}</td><td>${o.department}</td><td><span class="shift-badge ${o.shift}">${shiftLabel(o.shift)}</span></td><td>${orderMealLocation(o)}</td><td><span class="money-red">${money(o.price)}</span></td><td>${o.status}</td><td>${o.source}</td></tr>`)
             .join("")}
         </tbody>
       </table>
@@ -1586,7 +1652,8 @@ async function exportDailyReport() {
       (summary.menuItems || []).map((item) => [day.mealDate, summary.shiftLabel, item.seq, item.name, menuQuantityText(item), item.unitPrice, item.amount])
     )
   );
-  const detailRows = data.orders.map((o) => [o.mealDate, o.phone || o.employeeCode, o.fullName, o.department, shiftLabel(o.shift), o.price, o.status, o.source]);
+  const locationRows = (data.byLocation || []).map((row) => [row.mealDate, row.shiftLabel, row.mealLocation, row.qty]);
+  const detailRows = data.orders.map((o) => [o.mealDate, o.phone || o.employeeCode, o.fullName, o.department, shiftLabel(o.shift), orderMealLocation(o), o.price, o.status, o.source]);
   downloadExcel(`bao-cao-suat-an-${data.startDate}-${data.endDate}.xls`, `Báo cáo suất ăn ${data.startDate} - ${data.endDate}`, [
     {
       title: "Tổng hợp theo ngày",
@@ -1603,13 +1670,18 @@ async function exportDailyReport() {
       rows: data.byDepartment.map((row) => [row.department, row.lunchQty, row.dinnerQty, row.totalQty, row.totalAmount]),
     },
     {
+      title: "Thống kê theo vị trí giao cơm",
+      headers: ["Ngày", "Ca", "Vị trí ăn", "Số suất"],
+      rows: locationRows,
+    },
+    {
       title: "Định lượng thực đơn",
       headers: ["Ngày", "Ca", "STT", "Tên món", "Định lượng", "Đơn giá", "Thành tiền"],
       rows: menuRows,
     },
     {
       title: "Danh sách chi tiết",
-      headers: ["Ngày", "Số điện thoại", "Họ tên", "Bộ phận", "Ca", "Giá", "Trạng thái", "Nguồn"],
+      headers: ["Ngày", "Số điện thoại", "Họ tên", "Bộ phận", "Ca", "Vị trí ăn", "Giá", "Trạng thái", "Nguồn"],
       rows: detailRows,
     },
   ]);
