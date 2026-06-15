@@ -14,6 +14,7 @@ const state = {
   dailyReport: null,
   monthlyReport: null,
   workerConfirmedRange: null,
+  workerActionTab: "register",
 };
 
 const today = (() => {
@@ -804,56 +805,80 @@ async function renderWorker() {
   await loadOrders();
   const view = document.querySelector("#view");
   const minRegisterDate = registrationMinDate();
+  const workerActionTab = state.workerActionTab || "register";
   view.innerHTML = html`
     <div class="grid">
       <section class="panel span-12">
-        <h2>Đăng ký suất ăn</h2>
-        <div class="form-grid worker-range-form">
-          <label>Hình thức đăng ký
-            <select id="workerRegisterMode">
-              <option value="day">Đăng ký theo ngày</option>
-              <option value="week">Đăng ký theo tuần</option>
-              <option value="month">Đăng ký theo tháng</option>
-            </select>
-          </label>
-          <label class="worker-date-field" data-mode-field="day">Ngày ăn
-            <input id="workerDate" type="date" min="${minRegisterDate}" value="${minRegisterDate}" />
-          </label>
-          <label class="worker-date-field hidden" data-mode-field="week">Chọn một ngày trong tuần
-            <input id="workerWeekDate" type="date" min="${minRegisterDate}" value="${minRegisterDate}" />
-          </label>
-          <label class="worker-date-field hidden" data-mode-field="month">Tháng đăng ký
-            <input id="workerMonth" type="month" min="${currentMonth}" value="${currentMonth}" />
-          </label>
-          <fieldset class="shift-picker">
-            <legend>Ca ăn</legend>
-            <label><input type="checkbox" name="workerShift" value="lunch" /> Trưa</label>
-            <label><input type="checkbox" name="workerShift" value="dinner" /> Tối</label>
-          </fieldset>
-          <label>Vị trí ăn
-            <select id="workerMealLocation">${mealLocationOptions()}</select>
-          </label>
+        <div class="subtabs">
+          <button type="button" class="tab ${workerActionTab === "register" ? "active" : ""}" id="workerRegisterTab">Đăng ký suất ăn</button>
+          <button type="button" class="tab ${workerActionTab === "cancel" ? "active" : ""}" id="workerCancelTab">Hủy đăng ký</button>
         </div>
-        <div class="actions">
-          <button id="registerWorkerRange">Đăng ký suất ăn</button>
-          <button id="cancelWorkerRange" class="danger">Hủy đăng ký</button>
-          <button id="exportWorkerDay" class="secondary">Xuất Excel theo ngày</button>
-        </div>
-        <div id="workerCalendar"></div>
-        <div id="workerRangePreview"></div>
-        <div id="workerMeals"></div>
-        <section class="panel span-12 worker-cancel-panel" id="workerCancelPanel">
-          <h2>Hủy đăng ký suất ăn</h2>
-          <p class="muted">Chỉ hiển thị các lượt đã đăng ký trong tháng. Ngày đã qua hoặc đã quá giờ chốt sẽ bị khóa, không thể chọn để hủy.</p>
-          <label>Tháng cần hủy
-            <input id="workerCancelMonth" type="month" min="${currentMonth}" value="${currentMonth}" />
-          </label>
-          <div id="workerCancelList"></div>
-          <div id="workerCancelMessage"></div>
-        </section>
+        ${
+          workerActionTab === "cancel"
+            ? html`
+                <section id="workerCancelPanel">
+                  <h2>Hủy đăng ký suất ăn</h2>
+                  <p class="muted">Chỉ hiển thị các lượt đã đăng ký trong tháng. Ngày đã qua hoặc đã quá giờ chốt sẽ bị khóa, không thể chọn để hủy.</p>
+                  <label>Tháng cần hủy
+                    <input id="workerCancelMonth" type="month" min="${currentMonth}" value="${currentMonth}" />
+                  </label>
+                  <div id="workerCancelList"></div>
+                  <div id="workerCancelMessage"></div>
+                </section>
+              `
+            : html`
+                <h2>Đăng ký suất ăn</h2>
+                <div class="form-grid worker-range-form">
+                  <label>Hình thức đăng ký
+                    <select id="workerRegisterMode">
+                      <option value="day">Đăng ký theo ngày</option>
+                      <option value="week">Đăng ký theo tuần</option>
+                      <option value="month">Đăng ký theo tháng</option>
+                    </select>
+                  </label>
+                  <label class="worker-date-field" data-mode-field="day">Ngày ăn
+                    <input id="workerDate" type="date" min="${minRegisterDate}" value="${minRegisterDate}" />
+                  </label>
+                  <label class="worker-date-field hidden" data-mode-field="week">Chọn một ngày trong tuần
+                    <input id="workerWeekDate" type="date" min="${minRegisterDate}" value="${minRegisterDate}" />
+                  </label>
+                  <label class="worker-date-field hidden" data-mode-field="month">Tháng đăng ký
+                    <input id="workerMonth" type="month" min="${currentMonth}" value="${currentMonth}" />
+                  </label>
+                  <fieldset class="shift-picker">
+                    <legend>Ca ăn</legend>
+                    <label><input type="checkbox" name="workerShift" value="lunch" /> Trưa</label>
+                    <label><input type="checkbox" name="workerShift" value="dinner" /> Tối</label>
+                  </fieldset>
+                  <label>Vị trí ăn
+                    <select id="workerMealLocation">${mealLocationOptions()}</select>
+                  </label>
+                </div>
+                <div class="actions">
+                  <button id="registerWorkerRange">Đăng ký suất ăn</button>
+                  <button id="exportWorkerDay" class="secondary">Xuất Excel theo ngày</button>
+                </div>
+                <div id="workerCalendar"></div>
+                <div id="workerRangePreview"></div>
+                <div id="workerMeals"></div>
+              `
+        }
       </section>
     </div>
   `;
+  document.querySelector("#workerRegisterTab").addEventListener("click", () => {
+    state.workerActionTab = "register";
+    renderWorker();
+  });
+  document.querySelector("#workerCancelTab").addEventListener("click", () => {
+    state.workerActionTab = "cancel";
+    renderWorker();
+  });
+  if (workerActionTab === "cancel") {
+    document.querySelector("#workerCancelMonth").addEventListener("change", renderWorkerCancelPanel);
+    renderWorkerCancelPanel();
+    return;
+  }
   document.querySelector("#workerRegisterMode").addEventListener("change", updateWorkerRangeView);
   document.querySelector("#workerDate").addEventListener("change", updateWorkerRangeView);
   document.querySelector("#workerWeekDate").addEventListener("change", updateWorkerRangeView);
@@ -861,13 +886,8 @@ async function renderWorker() {
   document.querySelectorAll("[name='workerShift']").forEach((input) => input.addEventListener("change", updateWorkerRangeView));
   document.querySelector("#workerMealLocation").addEventListener("change", updateWorkerRangeView);
   document.querySelector("#registerWorkerRange").addEventListener("click", () => processWorkerRange("register"));
-  document.querySelector("#cancelWorkerRange").addEventListener("click", () => {
-    document.querySelector("#workerCancelPanel").scrollIntoView({ behavior: "smooth", block: "start" });
-  });
   document.querySelector("#exportWorkerDay").addEventListener("click", exportWorkerDay);
-  document.querySelector("#workerCancelMonth").addEventListener("change", renderWorkerCancelPanel);
   updateWorkerRangeView();
-  renderWorkerCancelPanel();
 }
 
 function selectedWorkerShifts() {
@@ -1213,7 +1233,7 @@ async function cancelSelectedWorkerOrders() {
   }
   await loadBootstrap();
   await loadOrders();
-  renderWorkerMeals();
+  if (document.querySelector("#workerMeals")) renderWorkerMeals();
   renderWorkerCancelPanel();
   const result = errors.length
     ? `Đã hủy thành công ${success}/${selected.length} suất. Chưa xử lý được: ${errors.join("; ")}`
