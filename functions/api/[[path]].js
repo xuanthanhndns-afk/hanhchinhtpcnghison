@@ -3,6 +3,7 @@ let xlsxModule = null;
 const SESSION_DAYS = 14;
 const ONLINE_WINDOW_MINUTES = 15;
 const ONLINE_WINDOW_MS = ONLINE_WINDOW_MINUTES * 60 * 1000;
+const MENU_RETENTION_DAYS = 31;
 const MEAL_LOCATIONS = [
   "Trạm cân",
   "Trạm điện 220",
@@ -272,6 +273,20 @@ function isBeforeCutoff(mealDate, cutoffTime) {
 
 function vietnamTodayIso() {
   return new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function addDaysIso(value, days) {
+  const [year, month, day] = String(value || vietnamTodayIso()).slice(0, 10).split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function cleanupOldMenus(db) {
+  const cutoffDate = addDaysIso(vietnamTodayIso(), -MENU_RETENTION_DAYS);
+  const before = (db.menus || []).length;
+  db.menus = (db.menus || []).filter((menu) => !menu.mealDate || String(menu.mealDate).slice(0, 10) >= cutoffDate);
+  return before - db.menus.length;
 }
 
 function isPastMealDate(mealDate) {
@@ -759,6 +774,11 @@ async function handleApi(request, env) {
   if (route === "GET /api/bootstrap") {
     const user = await requireUser(request, env);
     const db = await readDb(env);
+    const deletedMenus = cleanupOldMenus(db);
+    if (deletedMenus) {
+      audit(db, user, "CLEANUP_OLD_MENUS", { deleted: deletedMenus, retentionDays: MENU_RETENTION_DAYS });
+      await writeDb(env, db);
+    }
     const lock = isWorkerRegistrationLocked(db, user);
     return json({
       user: { ...sanitizeUser(user), registrationLockedNow: lock.locked, lockReasonNow: lock.reason || "" },
@@ -943,6 +963,7 @@ async function handleApi(request, env) {
     const user = await requireRole(request, env, ["admin", "kitchen"]);
     const body = await readBody(request);
     const db = await readDb(env);
+    cleanupOldMenus(db);
     const shift = normalizeShift(body.shift);
     const mealDate = String(body.mealDate || "").slice(0, 10);
     const items = normalizeMenuItems(Array.isArray(body.items) ? body.items : parseMenuItems(body.itemsText || body.dishes));

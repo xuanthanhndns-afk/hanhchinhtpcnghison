@@ -24,6 +24,7 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 const DATABASE_URL = process.env.DATABASE_URL || "";
 const ONLINE_WINDOW_MINUTES = 15;
 const ONLINE_WINDOW_MS = ONLINE_WINDOW_MINUTES * 60 * 1000;
+const MENU_RETENTION_DAYS = 31;
 const MEAL_LOCATIONS = [
   "Trạm cân",
   "Trạm điện 220",
@@ -278,6 +279,20 @@ function isBeforeCutoff(mealDate, cutoffTime) {
 
 function vietnamTodayIso() {
   return new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function addDaysIso(value, days) {
+  const [year, month, day] = String(value || vietnamTodayIso()).slice(0, 10).split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function cleanupOldMenus(db) {
+  const cutoffDate = addDaysIso(vietnamTodayIso(), -MENU_RETENTION_DAYS);
+  const before = (db.menus || []).length;
+  db.menus = (db.menus || []).filter((menu) => !menu.mealDate || String(menu.mealDate).slice(0, 10) >= cutoffDate);
+  return before - db.menus.length;
 }
 
 function isPastMealDate(mealDate) {
@@ -790,6 +805,11 @@ async function api(req, res) {
       const user = requireUser(req, res);
       if (!user) return;
       const db = readDb();
+      const deletedMenus = cleanupOldMenus(db);
+      if (deletedMenus) {
+        audit(db, user, "CLEANUP_OLD_MENUS", { deleted: deletedMenus, retentionDays: MENU_RETENTION_DAYS });
+        await writeDb(db);
+      }
       const lock = isWorkerRegistrationLocked(db, user);
       return json(res, 200, {
         user: { ...sanitizeUser(user), registrationLockedNow: lock.locked, lockReasonNow: lock.reason || "" },
@@ -985,6 +1005,7 @@ async function api(req, res) {
       if (!user) return;
       const body = await readBody(req);
       const db = readDb();
+      cleanupOldMenus(db);
       const shift = normalizeShift(body.shift);
       const mealDate = String(body.mealDate || "").slice(0, 10);
       const items = normalizeMenuItems(Array.isArray(body.items) ? body.items : parseMenuItems(body.itemsText || body.dishes));
